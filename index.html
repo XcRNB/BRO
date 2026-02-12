@@ -41,7 +41,7 @@ body{background:#000;padding:8px;}
       <input id="nps" placeholder="密码">
       <button class="btn btn-dark" id="addBtn">增</button>
     </div>
-    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 自动写入 GitHub，所有人实时同步</p>
+    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 实时写入 GitHub，删除立即生效</p>
   </div>
 </div>
 
@@ -50,28 +50,43 @@ let data = [];
 const owner = 'XcRNB';
 const repo = 'BRO';
 const path = 'list.json';
-let token = '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';
+const token = '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';
 
-async function loadList() {
+// ===== 直接从 GitHub 读取最新数据，不用本地缓存 =====
+async function loadFromGitHub() {
   try {
-    let res = await fetch('list.json');
-    data = await res.json();
+    let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    let res = await fetch(url, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    let data = await res.json();
+    let content = decodeURIComponent(escape(atob(data.content)));
+    return JSON.parse(content);
   } catch(e) {
-    alert('读取 list.json 失败');
-    data = [];
+    // 如果 API 失败，降级到 list.json
+    try {
+      let res = await fetch('list.json');
+      return await res.json();
+    } catch(e2) {
+      alert('读取数据失败');
+      return [];
+    }
   }
 }
 
-async function saveToList() {
+// ===== 保存到 GitHub =====
+async function saveToGitHub(newData) {
   try {
-    let content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     
+    // 获取当前文件的 sha
     let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       headers: { 'Authorization': `token ${token}` }
     });
     let getData = await getRes.json();
     let sha = getData.sha;
     
+    // 写入新内容
     let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
       headers: { 
@@ -86,15 +101,20 @@ async function saveToList() {
     });
     
     if (putRes.ok) {
-      alert('✅ GitHub 已更新，刷新后所有人可见');
+      data = newData;  // 更新本地数据
+      renderAdmin();
+      return true;
     } else {
-      alert('❌ 写入失败，请检查 token');
+      alert('❌ GitHub 写入失败');
+      return false;
     }
   } catch(e) {
-    alert('❌ 写入失败：' + e.message);
+    alert('❌ 保存失败：' + e.message);
+    return false;
   }
 }
 
+// ===== 渲染后台 =====
 function renderAdmin() {
   let h = '';
   data.forEach((v,i) => {
@@ -111,25 +131,28 @@ function renderAdmin() {
   document.getElementById('adminList').innerHTML = h;
 }
 
+// ===== 编辑 =====
 window.editItem = async function(i) {
   let id = document.getElementById(`id_${i}`).value;
   let name = document.getElementById(`name_${i}`).value;
   let pass = document.getElementById(`pass_${i}`).value;
   if (id && name && pass) {
-    data[i] = {id, name, pass};
-    renderAdmin();
-    await saveToList();
+    let newData = [...data];
+    newData[i] = {id, name, pass};
+    await saveToGitHub(newData);
   }
 };
 
+// ===== 删除 =====
 window.delItem = async function(i) {
   if (confirm('确认删除？')) {
-    data.splice(i, 1);
-    renderAdmin();
-    await saveToList();
+    let newData = [...data];
+    newData.splice(i, 1);
+    await saveToGitHub(newData);
   }
 };
 
+// ===== 查询 =====
 document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
@@ -138,6 +161,7 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
+// ===== 后台登录 =====
 let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault(); c++;
@@ -146,6 +170,8 @@ document.getElementById('adminBtn').onclick = async function(e) {
       let r = await fetch('password.json');
       let pwd = await r.json();
       if (prompt('后台密码') === pwd.admin) {
+        // 进入后台前先加载最新数据
+        data = await loadFromGitHub();
         document.getElementById('front').classList.add('hide');
         document.getElementById('adminView').classList.remove('hide');
         renderAdmin();
@@ -157,28 +183,36 @@ document.getElementById('adminBtn').onclick = async function(e) {
   }
 };
 
+// ===== 返回前台 =====
 document.getElementById('backBtn').onclick = function(e) {
   e.preventDefault();
   document.getElementById('adminView').classList.add('hide');
   document.getElementById('front').classList.remove('hide');
 };
 
+// ===== 增加 =====
 document.getElementById('addBtn').onclick = async function() {
   let id = document.getElementById('nid').value;
   let name = document.getElementById('nnm').value;
   let pass = document.getElementById('nps').value;
   if (id && name && pass) {
-    if (data.find(v => v.id === id)) { alert('编号已存在'); return; }
-    data.push({id, name, pass});
-    renderAdmin();
-    await saveToList();
+    if (data.find(v => v.id === id)) { 
+      alert('编号已存在'); 
+      return; 
+    }
+    let newData = [...data];
+    newData.push({id, name, pass});
+    await saveToGitHub(newData);
     document.getElementById('nid').value = '';
     document.getElementById('nnm').value = '';
     document.getElementById('nps').value = '';
   }
 };
 
-loadList();
+// ===== 初始化：从 GitHub 加载 =====
+(async function init() {
+  data = await loadFromGitHub();
+})();
 </script>
 </body>
 </html>

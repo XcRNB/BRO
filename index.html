@@ -3,192 +3,160 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>账号</title>
+<title>账</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-body{background:#000;display:flex;min-height:100vh;padding:0;}
-.app{width:100%;background:#fff;border:2px solid #000;display:flex;flex-direction:column;min-height:100vh;}
-.content{padding:16px;flex:1;display:flex;flex-direction:column;}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
-.top h2{font-size:22px;}
-.btn{background:#fff;border:2px solid #000;padding:8px 14px;font-weight:600;font-size:15px;}
-.btn-dark{background:#000;color:#fff;}
-#key{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
-.show{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;background:#fafafa;}
-.show div:first-child{font-size:40px;font-weight:700;}
-.show div:last-child{font-size:32px;font-family:monospace;word-break:break-all;}
-.hide{display:none!important;}
-.row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
-.row input{flex:1;border:2px solid #000;padding:10px;font-size:15px;background:#fff;min-width:0;}
-.row div{display:flex;gap:5px;flex-shrink:0;}
-.row .btn{padding:8px 10px;font-size:14px;}
-.listarea{margin-bottom:20px;}
-.addgroup{display:flex;gap:6px;margin-top:5px;flex-wrap:nowrap;}
-.addgroup input{flex:1;border:2px solid #000;padding:12px;font-size:15px;min-width:0;}
-.addgroup .btn-dark{padding:12px 16px;flex-shrink:0;}
-.notice{color:#666;font-size:12px;margin-top:12px;text-align:center;}
+body{background:#000;padding:0;}
+.a{width:100%;background:#fff;border:2px solid #000;min-height:100vh;padding:16px;}
+.b{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.c{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
+.d{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;}
+.d div:first-child{font-size:40px;font-weight:700;}
+.d div:last-child{font-size:32px;font-family:monospace;}
+.e{display:none!important;}
+.f{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.f input{flex:1;border:2px solid #000;padding:10px;font-size:15px;}
+.f div{display:flex;gap:5px;}
+.g{margin-bottom:20px;}
+.h{display:flex;gap:6px;margin-top:5px;}
+.h input{flex:1;border:2px solid #000;padding:12px;font-size:15px;}
+.btn{border:2px solid #000;padding:8px 14px;background:#fff;font-weight:600;}
+.btn2{background:#000;color:#fff;}
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="content">
-    <div class="top"><h2>账号</h2><button class="btn" id="adminBtn">后台</button></div>
-    
-    <div id="front">
-      <input id="key" placeholder="输入编号" autofocus>
-      <div class="show" id="result"><div>-</div><div>-</div></div>
-    </div>
-    
-    <div id="admin" class="hide">
-      <div class="top"><h2>后台管理</h2><button class="btn" id="backBtn">返回</button></div>
-      <div id="adminList" class="listarea"></div>
-      <div class="addgroup">
-        <input id="newId" placeholder="编号">
-        <input id="newName" placeholder="姓名">
-        <input id="newPass" placeholder="密码">
-        <button class="btn btn-dark" id="addBtn">增加</button>
-      </div>
-      <div class="notice">把当前链接发给别人，他们看到的就是最新数据</div>
+<div class="a">
+  <div class="b"><h2>账</h2><button class="btn" id="a1">后</button></div>
+  
+  <div id="b1">
+    <input class="c" id="c1" placeholder="编号" autofocus>
+    <div class="d" id="d1"><div>-</div><div>-</div></div>
+  </div>
+  
+  <div id="b2" class="e">
+    <div class="b"><h2>后</h2><button class="btn" id="e1">返</button></div>
+    <div id="f1" class="g"></div>
+    <div class="h">
+      <input id="g1" placeholder="编">
+      <input id="g2" placeholder="姓">
+      <input id="g3" placeholder="密">
+      <button class="btn btn2" id="h1">增</button>
     </div>
   </div>
 </div>
 
 <script>
-// ===== 所有数据只存在 URL 参数里 =====
-let database = [];
-
-// 初始化：优先从URL读取，如果没有则读取list.json作为初始数据
-async function init() {
-  let urlData = new URLSearchParams(location.search).get('d');
-  if (urlData) {
-    try {
-      database = JSON.parse(decodeURIComponent(urlData));
-    } catch(e) {
-      database = [];
-    }
-  } else {
-    // 第一次访问，从list.json加载初始数据
-    try {
-      let res = await fetch('list.json');
-      database = await res.json();
-      // 立刻保存到URL，这样刷新页面就不会丢失
-      saveToURL(database, false);
-    } catch(err) {
-      alert('读取list.json失败');
-      database = [];
-    }
+let data = [];
+let init = async () => {
+  let url = new URLSearchParams(location.search).get('d');
+  if (url) {
+    try { data = JSON.parse(decodeURIComponent(url)); } catch(e) {}
+    renderFront();
+    return;
   }
-}
-
-// 保存到URL（不刷新页面）
-function saveToURL(data, reload = true) {
-  database = data;
-  let encoded = encodeURIComponent(JSON.stringify(database));
-  let newUrl = location.pathname + '?d=' + encoded;
-  window.history.pushState({path: newUrl}, '', newUrl);
-  if (reload) {
-    // 刷新页面让数据完全重置
-    location.reload();
+  try {
+    let res = await fetch('list.json');
+    data = await res.json();
+    toURL();
+  } catch(e) {
+    alert('list.json?');
   }
-}
+};
 
-// 渲染后台列表
-function renderAdmin() {
-  let html = '';
-  database.forEach((item, index) => {
-    html += `<div class="row">
-      <input id="id_${index}" value="${item.id}">
-      <input id="name_${index}" value="${item.name}">
-      <input id="pass_${index}" value="${item.pass}">
+let toURL = () => {
+  let e = encodeURIComponent(JSON.stringify(data));
+  history.pushState({}, '', location.pathname + '?d=' + e);
+  renderFront();
+};
+
+let renderFront = () => {
+  let i = document.getElementById('c1');
+  if (i) i.value = '';
+  document.getElementById('d1').innerHTML = '<div>-</div><div>-</div>';
+};
+
+let renderAdmin = () => {
+  let h = '';
+  data.forEach((v,i) => {
+    h += `<div class="f">
+      <input id="i${i}" value="${v.id}">
+      <input id="j${i}" value="${v.name}">
+      <input id="k${i}" value="${v.pass}">
       <div>
-        <button class="btn" onclick="editItem(${index})">保存</button>
-        <button class="btn" onclick="deleteItem(${index})">删除</button>
+        <button class="btn" onclick="edit(${i})">存</button>
+        <button class="btn" onclick="del(${i})">删</button>
       </div>
     </div>`;
   });
-  document.getElementById('adminList').innerHTML = html;
-}
+  document.getElementById('f1').innerHTML = h;
+};
 
-// 编辑
-window.editItem = function(index) {
-  let id = document.getElementById(`id_${index}`).value;
-  let name = document.getElementById(`name_${index}`).value;
-  let pass = document.getElementById(`pass_${index}`).value;
-  if (id && name && pass) {
-    let newData = [...database];
-    newData[index] = {id, name, pass};
-    saveToURL(newData);
+window.edit = (i) => {
+  let id = document.getElementById(`i${i}`).value;
+  let nm = document.getElementById(`j${i}`).value;
+  let ps = document.getElementById(`k${i}`).value;
+  if (id && nm && ps) {
+    data[i] = {id, name: nm, pass: ps};
+    toURL();
+    renderAdmin();
   }
 };
 
-// 删除
-window.deleteItem = function(index) {
-  if (confirm('确认删除？')) {
-    let newData = [...database];
-    newData.splice(index, 1);
-    saveToURL(newData);
-  }
+window.del = (i) => {
+  data.splice(i, 1);
+  toURL();
+  renderAdmin();
 };
 
-// 查询
-document.getElementById('key').oninput = function() {
+document.getElementById('c1').oninput = function() {
   let v = this.value.trim();
-  let found = database.find(item => item.id === v);
-  document.getElementById('result').innerHTML = v 
-    ? found 
-      ? `<div>${found.name}</div><div>${found.pass}</div>` 
-      : '<div>无</div><div>-</div>'
+  let x = data.find(d => d.id === v);
+  document.getElementById('d1').innerHTML = v 
+    ? x ? `<div>${x.name}</div><div>${x.pass}</div>` : '<div>无</div><div>-</div>'
     : '<div>-</div><div>-</div>';
 };
 
-// 后台登录
-let clickCount = 0;
-document.getElementById('adminBtn').onclick = async function(e) {
+let cnt = 0;
+document.getElementById('a1').onclick = async function(e) {
   e.preventDefault();
-  clickCount++;
-  if (clickCount === 3) {
+  cnt++;
+  if (cnt == 3) {
     try {
-      let res = await fetch('password.json');
-      let pwdData = await res.json();
-      let inputPwd = prompt('后台密码');
-      if (inputPwd === pwdData.admin) {
-        document.getElementById('front').classList.add('hide');
-        document.getElementById('admin').classList.remove('hide');
+      let r = await fetch('password.json');
+      let p = await r.json();
+      if (prompt('密码') === p.admin) {
+        document.getElementById('b1').classList.add('e');
+        document.getElementById('b2').classList.remove('e');
         renderAdmin();
-      } else {
-        alert('密码错误');
-      }
-    } catch(err) {
-      alert('读取password.json失败');
+      } else alert('x');
+    } catch(e) {
+      alert('password.json?');
     }
-    clickCount = 0;
+    cnt = 0;
   }
 };
 
-// 返回前台
-document.getElementById('backBtn').onclick = function(e) {
+document.getElementById('e1').onclick = function(e) {
   e.preventDefault();
-  document.getElementById('admin').classList.add('hide');
-  document.getElementById('front').classList.remove('hide');
+  document.getElementById('b2').classList.add('e');
+  document.getElementById('b1').classList.remove('e');
 };
 
-// 添加账号
-document.getElementById('addBtn').onclick = function() {
-  let id = document.getElementById('newId').value;
-  let name = document.getElementById('newName').value;
-  let pass = document.getElementById('newPass').value;
-  if (id && name && pass) {
-    if (database.find(item => item.id === id)) {
-      alert('编号已存在');
-      return;
-    }
-    let newData = [...database];
-    newData.push({id, name, pass});
-    saveToURL(newData);
+document.getElementById('h1').onclick = function() {
+  let id = document.getElementById('g1').value;
+  let nm = document.getElementById('g2').value;
+  let ps = document.getElementById('g3').value;
+  if (id && nm && ps) {
+    if (data.find(v => v.id === id)) { alert('已存在'); return; }
+    data.push({id, name: nm, pass: ps});
+    toURL();
+    renderAdmin();
+    document.getElementById('g1').value = '';
+    document.getElementById('g2').value = '';
+    document.getElementById('g3').value = '';
   }
 };
 
-// 启动
 init();
 </script>
 </body>

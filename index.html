@@ -3,84 +3,93 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>通</title>
+<title>账号</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-. outwardly{background:#000;display:flex;min-height:100vh;padding:0;}
-.container{width:100%;background:#fff;border:2px solid #000;display:flex;flex-direction:column;min-height:100vh;}
-.wrapper{padding:16px;flex:1;display:flex;flex-direction:column;}
-.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
-.head h2{font-size:22px;}
-.button{background:#fff;border:2px solid #000;padding:8px 14px;font-weight:600;font-size:15px;}
-.button_dark{background:#000;color:#fff;}
-.input{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
-.display{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;background:#fafafa;}
-.display div:first-child{font-size:40px;font-weight:700;}
-.display div:last-child{font-size:32px;font-family:monospace;word-break:break-all;}
-.hidden{display:none!important;}
+body{background:#000;display:flex;min-height:100vh;padding:0;}
+.app{width:100%;background:#fff;border:2px solid #000;display:flex;flex-direction:column;min-height:100vh;}
+.content{padding:16px;flex:1;display:flex;flex-direction:column;}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.top h2{font-size:22px;}
+.btn{background:#fff;border:2px solid #000;padding:8px 14px;font-weight:600;font-size:15px;}
+.btn-dark{background:#000;color:#fff;}
+#key{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
+.show{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;background:#fafafa;}
+.show div:first-child{font-size:40px;font-weight:700;}
+.show div:last-child{font-size:32px;font-family:monospace;word-break:break-all;}
+.hide{display:none!important;}
 .row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
 .row input{flex:1;border:2px solid #000;padding:10px;font-size:15px;background:#fff;min-width:0;}
 .row div{display:flex;gap:5px;flex-shrink:0;}
-.row .button{padding:8px 10px;font-size:14px;}
+.row .btn{padding:8px 10px;font-size:14px;}
 .listarea{margin-bottom:20px;}
 .addgroup{display:flex;gap:6px;margin-top:5px;flex-wrap:nowrap;}
 .addgroup input{flex:1;border:2px solid #000;padding:12px;font-size:15px;min-width:0;}
-.addgroup .button_dark{padding:12px 16px;flex-shrink:0;}
+.addgroup .btn-dark{padding:12px 16px;flex-shrink:0;}
 .notice{color:#666;font-size:12px;margin-top:12px;text-align:center;}
 </style>
 </head>
 <body>
-<div class="outwardly">
-  <div class="container">
-    <div class="wrapper">
-      <div class="head"><h2>通</h2><button class="button" id="adminBtn">后台</button></div>
-      
-      <div id="frontView">
-        <input class="input" id="searchInput" placeholder="输入编号" autofocus>
-        <div class="display" id="resultDisplay"><div>-</div><div>-</div></div>
+<div class="app">
+  <div class="content">
+    <div class="top"><h2>账号</h2><button class="btn" id="adminBtn">后台</button></div>
+    
+    <div id="front">
+      <input id="key" placeholder="输入编号" autofocus>
+      <div class="show" id="result"><div>-</div><div>-</div></div>
+    </div>
+    
+    <div id="admin" class="hide">
+      <div class="top"><h2>后台管理</h2><button class="btn" id="backBtn">返回</button></div>
+      <div id="adminList" class="listarea"></div>
+      <div class="addgroup">
+        <input id="newId" placeholder="编号">
+        <input id="newName" placeholder="姓名">
+        <input id="newPass" placeholder="密码">
+        <button class="btn btn-dark" id="addBtn">增加</button>
       </div>
-      
-      <div id="adminView" class="hidden">
-        <div class="head"><h2>后台管理</h2><button class="button" id="backBtn">返回</button></div>
-        <div id="adminList" class="listarea"></div>
-        <div class="addgroup">
-          <input id="newId" placeholder="编号">
-          <input id="newName" placeholder="姓名">
-          <input id="newPass" placeholder="密码">
-          <button class="button button_dark" id="addBtn">增</button>
-        </div>
-        <div class="notice">修改后自动生成链接，复制发给其他人</div>
-      </div>
+      <div class="notice">把当前链接发给别人，他们看到的就是最新数据</div>
     </div>
   </div>
 </div>
 
 <script>
-// 数据存储
+// ===== 所有数据只存在 URL 参数里 =====
 let database = [];
 
-// 从URL参数读取
-let urlParams = new URLSearchParams(location.search).get('d');
-if(urlParams) try { database = JSON.parse(decodeURIComponent(urlParams)); } catch(e) {}
-
-// 从list.json加载
-async function loadList() {
-  try {
-    let response = await fetch('list.json');
-    database = await response.json();
-  } catch(error) {
-    alert('读取 list.json 失败，请确认文件已上传');
-    database = [];
-  }
+// 初始化：优先从URL读取，如果没有则读取list.json作为初始数据
+async function init() {
   let urlData = new URLSearchParams(location.search).get('d');
-  if(urlData) try { database = JSON.parse(decodeURIComponent(urlData)); } catch(e) {}
+  if (urlData) {
+    try {
+      database = JSON.parse(decodeURIComponent(urlData));
+    } catch(e) {
+      database = [];
+    }
+  } else {
+    // 第一次访问，从list.json加载初始数据
+    try {
+      let res = await fetch('list.json');
+      database = await res.json();
+      // 立刻保存到URL，这样刷新页面就不会丢失
+      saveToURL(database, false);
+    } catch(err) {
+      alert('读取list.json失败');
+      database = [];
+    }
+  }
 }
 
-// 保存到URL
-function saveToURL(newData) {
-  database = newData;
+// 保存到URL（不刷新页面）
+function saveToURL(data, reload = true) {
+  database = data;
   let encoded = encodeURIComponent(JSON.stringify(database));
-  window.location.href = location.pathname + '?d=' + encoded;
+  let newUrl = location.pathname + '?d=' + encoded;
+  window.history.pushState({path: newUrl}, '', newUrl);
+  if (reload) {
+    // 刷新页面让数据完全重置
+    location.reload();
+  }
 }
 
 // 渲染后台列表
@@ -92,8 +101,8 @@ function renderAdmin() {
       <input id="name_${index}" value="${item.name}">
       <input id="pass_${index}" value="${item.pass}">
       <div>
-        <button class="button" onclick="editItem(${index})">存</button>
-        <button class="button" onclick="deleteItem(${index})">删</button>
+        <button class="btn" onclick="editItem(${index})">保存</button>
+        <button class="btn" onclick="deleteItem(${index})">删除</button>
       </div>
     </div>`;
   });
@@ -105,50 +114,52 @@ window.editItem = function(index) {
   let id = document.getElementById(`id_${index}`).value;
   let name = document.getElementById(`name_${index}`).value;
   let pass = document.getElementById(`pass_${index}`).value;
-  if(id && name && pass) {
+  if (id && name && pass) {
     let newData = [...database];
     newData[index] = {id, name, pass};
     saveToURL(newData);
   }
-}
+};
 
 // 删除
 window.deleteItem = function(index) {
-  let newData = [...database];
-  newData.splice(index, 1);
-  saveToURL(newData);
+  if (confirm('确认删除？')) {
+    let newData = [...database];
+    newData.splice(index, 1);
+    saveToURL(newData);
+  }
 };
 
 // 查询
-document.getElementById('searchInput').oninput = function() {
-  let value = this.value.trim();
-  let found = database.find(item => item.id === value);
-  document.getElementById('resultDisplay').innerHTML = value 
+document.getElementById('key').oninput = function() {
+  let v = this.value.trim();
+  let found = database.find(item => item.id === v);
+  document.getElementById('result').innerHTML = v 
     ? found 
       ? `<div>${found.name}</div><div>${found.pass}</div>` 
       : '<div>无</div><div>-</div>'
     : '<div>-</div><div>-</div>';
 };
 
-// 后台登录（点击3次）
+// 后台登录
 let clickCount = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault();
   clickCount++;
-  if(clickCount === 3) {
+  if (clickCount === 3) {
     try {
-      let response = await fetch('password.json');
-      let passwordData = await response.json();
-      let inputPassword = prompt('请输入后台密码');
-      if(inputPassword === passwordData.admin) {
-        document.getElementById('frontView').classList.add('hidden');
-        document.getElementById('adminView').classList.remove('hidden');
+      let res = await fetch('password.json');
+      let pwdData = await res.json();
+      let inputPwd = prompt('后台密码');
+      if (inputPwd === pwdData.admin) {
+        document.getElementById('front').classList.add('hide');
+        document.getElementById('admin').classList.remove('hide');
         renderAdmin();
       } else {
         alert('密码错误');
       }
-    } catch(error) {
-      alert('读取 password.json 失败，请确认文件已上传');
+    } catch(err) {
+      alert('读取password.json失败');
     }
     clickCount = 0;
   }
@@ -157,8 +168,8 @@ document.getElementById('adminBtn').onclick = async function(e) {
 // 返回前台
 document.getElementById('backBtn').onclick = function(e) {
   e.preventDefault();
-  document.getElementById('adminView').classList.add('hidden');
-  document.getElementById('frontView').classList.remove('hidden');
+  document.getElementById('admin').classList.add('hide');
+  document.getElementById('front').classList.remove('hide');
 };
 
 // 添加账号
@@ -166,8 +177,8 @@ document.getElementById('addBtn').onclick = function() {
   let id = document.getElementById('newId').value;
   let name = document.getElementById('newName').value;
   let pass = document.getElementById('newPass').value;
-  if(id && name && pass) {
-    if(database.find(item => item.id === id)) {
+  if (id && name && pass) {
+    if (database.find(item => item.id === id)) {
       alert('编号已存在');
       return;
     }
@@ -177,8 +188,8 @@ document.getElementById('addBtn').onclick = function() {
   }
 };
 
-// 初始化
-loadList();
+// 启动
+init();
 </script>
 </body>
 </html>

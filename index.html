@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>账 · Git</title>
+<title>BRO · 直写</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
 body{background:#000;padding:8px;}
@@ -25,7 +25,7 @@ body{background:#000;padding:8px;}
 </head>
 <body>
 <div class="app">
-  <div class="top"><h2>Git 库</h2><button class="btn" id="adminBtn">后台</button></div>
+  <div class="top"><h2>BRO · 直写</h2><button class="btn" id="adminBtn">后台</button></div>
   
   <div id="front">
     <input id="key" placeholder="编号" autofocus>
@@ -41,38 +41,60 @@ body{background:#000;padding:8px;}
       <input id="nps" placeholder="密码">
       <button class="btn btn-dark" id="addBtn">增</button>
     </div>
-    <p style="color:#c00;font-size:13px;margin-top:15px;text-align:center;">⚠️ 改完后点「存」或「增」自动下载 list.json，手动上传 GitHub 覆盖</p>
+    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 自动写入 GitHub，所有人实时同步</p>
   </div>
 </div>
 
 <script>
-// ===== 读写 list.json（GitHub 数据库）=====
 let data = [];
+const owner = 'XcRNB';
+const repo = 'BRO';
+const path = 'list.json';
+let token = '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';
 
-// 读取 list.json
 async function loadList() {
   try {
     let res = await fetch('list.json');
     data = await res.json();
   } catch(e) {
-    alert('读取 list.json 失败，请确认文件已上传');
+    alert('读取 list.json 失败');
     data = [];
   }
 }
 
-// 保存到本地文件（手动上传 GitHub）
-function saveToList() {
-  let jsonStr = JSON.stringify(data, null, 2);
-  let blob = new Blob([jsonStr], {type: 'application/json'});
-  let url = URL.createObjectURL(blob);
-  let a = document.createElement('a');
-  a.href = url;
-  a.download = 'list.json';  // 直接覆盖 list.json
-  a.click();
-  alert('✅ list.json 已下载，请手动上传到 GitHub 覆盖旧文件');
+async function saveToList() {
+  try {
+    let content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    
+    let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    let getData = await getRes.json();
+    let sha = getData.sha;
+    
+    let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: { 
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'update list.json from web',
+        content: content,
+        sha: sha
+      })
+    });
+    
+    if (putRes.ok) {
+      alert('✅ GitHub 已更新，刷新后所有人可见');
+    } else {
+      alert('❌ 写入失败，请检查 token');
+    }
+  } catch(e) {
+    alert('❌ 写入失败：' + e.message);
+  }
 }
 
-// 渲染后台
 function renderAdmin() {
   let h = '';
   data.forEach((v,i) => {
@@ -89,28 +111,25 @@ function renderAdmin() {
   document.getElementById('adminList').innerHTML = h;
 }
 
-// 编辑
-window.editItem = function(i) {
+window.editItem = async function(i) {
   let id = document.getElementById(`id_${i}`).value;
   let name = document.getElementById(`name_${i}`).value;
   let pass = document.getElementById(`pass_${i}`).value;
   if (id && name && pass) {
     data[i] = {id, name, pass};
     renderAdmin();
-    saveToList();  // 自动下载 list.json
+    await saveToList();
   }
 };
 
-// 删除
-window.delItem = function(i) {
+window.delItem = async function(i) {
   if (confirm('确认删除？')) {
     data.splice(i, 1);
     renderAdmin();
-    saveToList();  // 自动下载 list.json
+    await saveToList();
   }
 };
 
-// 查询
 document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
@@ -119,7 +138,6 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
-// 后台密码验证
 let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault(); c++;
@@ -139,15 +157,13 @@ document.getElementById('adminBtn').onclick = async function(e) {
   }
 };
 
-// 返回前台
 document.getElementById('backBtn').onclick = function(e) {
   e.preventDefault();
   document.getElementById('adminView').classList.add('hide');
   document.getElementById('front').classList.remove('hide');
 };
 
-// 增加账号
-document.getElementById('addBtn').onclick = function() {
+document.getElementById('addBtn').onclick = async function() {
   let id = document.getElementById('nid').value;
   let name = document.getElementById('nnm').value;
   let pass = document.getElementById('nps').value;
@@ -155,14 +171,13 @@ document.getElementById('addBtn').onclick = function() {
     if (data.find(v => v.id === id)) { alert('编号已存在'); return; }
     data.push({id, name, pass});
     renderAdmin();
-    saveToList();  // 自动下载 list.json
+    await saveToList();
     document.getElementById('nid').value = '';
     document.getElementById('nnm').value = '';
     document.getElementById('nps').value = '';
   }
 };
 
-// 初始化
 loadList();
 </script>
 </body>

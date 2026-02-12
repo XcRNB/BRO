@@ -2,162 +2,168 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>账</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>账 · Git</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-body{background:#000;padding:0;}
-.a{width:100%;background:#fff;border:2px solid #000;min-height:100vh;padding:16px;}
-.b{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
-.c{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
-.d{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;}
-.d div:first-child{font-size:40px;font-weight:700;}
-.d div:last-child{font-size:32px;font-family:monospace;}
-.e{display:none!important;}
-.f{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
-.f input{flex:1;border:2px solid #000;padding:10px;font-size:15px;}
-.f div{display:flex;gap:5px;}
-.g{margin-bottom:20px;}
-.h{display:flex;gap:6px;margin-top:5px;}
-.h input{flex:1;border:2px solid #000;padding:12px;font-size:15px;}
+body{background:#000;padding:8px;}
+.app{background:#fff;border:2px solid #000;padding:16px;max-width:500px;margin:0 auto;}
+.top{display:flex;justify-content:space-between;margin-bottom:16px;}
+#key{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
+.show{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;}
+.show div:first-child{font-size:40px;font-weight:700;}
+.show div:last-child{font-size:32px;font-family:monospace;}
+.hide{display:none!important;}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.row input{flex:1;border:2px solid #000;padding:10px;}
+.row div{display:flex;gap:5px;}
 .btn{border:2px solid #000;padding:8px 14px;background:#fff;font-weight:600;}
-.btn2{background:#000;color:#fff;}
+.btn-dark{background:#000;color:#fff;}
+.addgroup{display:flex;gap:6px;margin-top:10px;}
+.addgroup input{flex:1;border:2px solid #000;padding:12px;}
 </style>
 </head>
 <body>
-<div class="a">
-  <div class="b"><h2>账</h2><button class="btn" id="a1">后</button></div>
+<div class="app">
+  <div class="top"><h2>Git 库</h2><button class="btn" id="adminBtn">后台</button></div>
   
-  <div id="b1">
-    <input class="c" id="c1" placeholder="编号" autofocus>
-    <div class="d" id="d1"><div>-</div><div>-</div></div>
+  <div id="front">
+    <input id="key" placeholder="编号" autofocus>
+    <div class="show" id="res"><div>-</div><div>-</div></div>
   </div>
   
-  <div id="b2" class="e">
-    <div class="b"><h2>后</h2><button class="btn" id="e1">返</button></div>
-    <div id="f1" class="g"></div>
-    <div class="h">
-      <input id="g1" placeholder="编">
-      <input id="g2" placeholder="姓">
-      <input id="g3" placeholder="密">
-      <button class="btn btn2" id="h1">增</button>
+  <div id="adminView" class="hide">
+    <div class="top"><h2>管理</h2><button class="btn" id="backBtn">返回</button></div>
+    <div id="adminList"></div>
+    <div class="addgroup">
+      <input id="nid" placeholder="编号">
+      <input id="nnm" placeholder="姓名">
+      <input id="nps" placeholder="密码">
+      <button class="btn btn-dark" id="addBtn">增</button>
     </div>
+    <p style="color:#c00;font-size:13px;margin-top:15px;text-align:center;">⚠️ 改完后点「存」或「增」自动下载 list.json，手动上传 GitHub 覆盖</p>
   </div>
 </div>
 
 <script>
+// ===== 读写 list.json（GitHub 数据库）=====
 let data = [];
-let init = async () => {
-  let url = new URLSearchParams(location.search).get('d');
-  if (url) {
-    try { data = JSON.parse(decodeURIComponent(url)); } catch(e) {}
-    renderFront();
-    return;
-  }
+
+// 读取 list.json
+async function loadList() {
   try {
     let res = await fetch('list.json');
     data = await res.json();
-    toURL();
   } catch(e) {
-    alert('list.json?');
+    alert('读取 list.json 失败，请确认文件已上传');
+    data = [];
   }
-};
+}
 
-let toURL = () => {
-  let e = encodeURIComponent(JSON.stringify(data));
-  history.pushState({}, '', location.pathname + '?d=' + e);
-  renderFront();
-};
+// 保存到本地文件（手动上传 GitHub）
+function saveToList() {
+  let jsonStr = JSON.stringify(data, null, 2);
+  let blob = new Blob([jsonStr], {type: 'application/json'});
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement('a');
+  a.href = url;
+  a.download = 'list.json';  // 直接覆盖 list.json
+  a.click();
+  alert('✅ list.json 已下载，请手动上传到 GitHub 覆盖旧文件');
+}
 
-let renderFront = () => {
-  let i = document.getElementById('c1');
-  if (i) i.value = '';
-  document.getElementById('d1').innerHTML = '<div>-</div><div>-</div>';
-};
-
-let renderAdmin = () => {
+// 渲染后台
+function renderAdmin() {
   let h = '';
   data.forEach((v,i) => {
-    h += `<div class="f">
-      <input id="i${i}" value="${v.id}">
-      <input id="j${i}" value="${v.name}">
-      <input id="k${i}" value="${v.pass}">
+    h += `<div class="row">
+      <input id="id_${i}" value="${v.id}">
+      <input id="name_${i}" value="${v.name}">
+      <input id="pass_${i}" value="${v.pass}">
       <div>
-        <button class="btn" onclick="edit(${i})">存</button>
-        <button class="btn" onclick="del(${i})">删</button>
+        <button class="btn" onclick="editItem(${i})">存</button>
+        <button class="btn" onclick="delItem(${i})">删</button>
       </div>
     </div>`;
   });
-  document.getElementById('f1').innerHTML = h;
-};
+  document.getElementById('adminList').innerHTML = h;
+}
 
-window.edit = (i) => {
-  let id = document.getElementById(`i${i}`).value;
-  let nm = document.getElementById(`j${i}`).value;
-  let ps = document.getElementById(`k${i}`).value;
-  if (id && nm && ps) {
-    data[i] = {id, name: nm, pass: ps};
-    toURL();
+// 编辑
+window.editItem = function(i) {
+  let id = document.getElementById(`id_${i}`).value;
+  let name = document.getElementById(`name_${i}`).value;
+  let pass = document.getElementById(`pass_${i}`).value;
+  if (id && name && pass) {
+    data[i] = {id, name, pass};
     renderAdmin();
+    saveToList();  // 自动下载 list.json
   }
 };
 
-window.del = (i) => {
-  data.splice(i, 1);
-  toURL();
-  renderAdmin();
+// 删除
+window.delItem = function(i) {
+  if (confirm('确认删除？')) {
+    data.splice(i, 1);
+    renderAdmin();
+    saveToList();  // 自动下载 list.json
+  }
 };
 
-document.getElementById('c1').oninput = function() {
+// 查询
+document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
-  document.getElementById('d1').innerHTML = v 
+  document.getElementById('res').innerHTML = v 
     ? x ? `<div>${x.name}</div><div>${x.pass}</div>` : '<div>无</div><div>-</div>'
     : '<div>-</div><div>-</div>';
 };
 
-let cnt = 0;
-document.getElementById('a1').onclick = async function(e) {
-  e.preventDefault();
-  cnt++;
-  if (cnt == 3) {
+// 后台密码验证
+let c = 0;
+document.getElementById('adminBtn').onclick = async function(e) {
+  e.preventDefault(); c++;
+  if (c === 3) {
     try {
       let r = await fetch('password.json');
-      let p = await r.json();
-      if (prompt('密码') === p.admin) {
-        document.getElementById('b1').classList.add('e');
-        document.getElementById('b2').classList.remove('e');
+      let pwd = await r.json();
+      if (prompt('后台密码') === pwd.admin) {
+        document.getElementById('front').classList.add('hide');
+        document.getElementById('adminView').classList.remove('hide');
         renderAdmin();
-      } else alert('x');
+      } else alert('密码错误');
     } catch(e) {
-      alert('password.json?');
+      alert('读取 password.json 失败');
     }
-    cnt = 0;
+    c = 0;
   }
 };
 
-document.getElementById('e1').onclick = function(e) {
+// 返回前台
+document.getElementById('backBtn').onclick = function(e) {
   e.preventDefault();
-  document.getElementById('b2').classList.add('e');
-  document.getElementById('b1').classList.remove('e');
+  document.getElementById('adminView').classList.add('hide');
+  document.getElementById('front').classList.remove('hide');
 };
 
-document.getElementById('h1').onclick = function() {
-  let id = document.getElementById('g1').value;
-  let nm = document.getElementById('g2').value;
-  let ps = document.getElementById('g3').value;
-  if (id && nm && ps) {
-    if (data.find(v => v.id === id)) { alert('已存在'); return; }
-    data.push({id, name: nm, pass: ps});
-    toURL();
+// 增加账号
+document.getElementById('addBtn').onclick = function() {
+  let id = document.getElementById('nid').value;
+  let name = document.getElementById('nnm').value;
+  let pass = document.getElementById('nps').value;
+  if (id && name && pass) {
+    if (data.find(v => v.id === id)) { alert('编号已存在'); return; }
+    data.push({id, name, pass});
     renderAdmin();
-    document.getElementById('g1').value = '';
-    document.getElementById('g2').value = '';
-    document.getElementById('g3').value = '';
+    saveToList();  // 自动下载 list.json
+    document.getElementById('nid').value = '';
+    document.getElementById('nnm').value = '';
+    document.getElementById('nps').value = '';
   }
 };
 
-init();
+// 初始化
+loadList();
 </script>
 </body>
 </html>

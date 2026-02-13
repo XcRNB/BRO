@@ -32,11 +32,16 @@ body{background:#000;padding:8px;}
 </div>
 
 <script>
-// 从URL获取参数
+// 从URL获取编码后的参数
 const urlParams = new URLSearchParams(window.location.search);
-const owner = urlParams.get('owner');
-const repo = urlParams.get('repo');
-const token = urlParams.get('token');
+const encodedOwner = urlParams.get('o');
+const encodedRepo = urlParams.get('r');
+const encodedToken = urlParams.get('t');
+
+// 解码
+const owner = atob(encodedOwner);
+const repo = atob(encodedRepo);
+const token = atob(encodedToken);
 const path = 'list.json';
 
 let data = [];

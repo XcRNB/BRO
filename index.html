@@ -41,7 +41,7 @@ body{background:#000;padding:8px;}
       <input id="nps" placeholder="密码">
       <button class="btn btn-dark" id="addBtn">增</button>
     </div>
-    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 实时写入 GitHub，删除立即生效</p>
+    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 每次操作自动获取最新sha</p>
   </div>
 </div>
 
@@ -52,41 +52,32 @@ const repo = 'BRO';
 const path = 'list.json';
 const token = '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';
 
-// ===== 直接从 GitHub 读取最新数据，不用本地缓存 =====
-async function loadFromGitHub() {
+// ===== 获取最新文件内容和 sha =====
+async function getLatest() {
   try {
     let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
     let res = await fetch(url, {
       headers: { 'Authorization': `token ${token}` }
     });
-    let data = await res.json();
-    let content = decodeURIComponent(escape(atob(data.content)));
-    return JSON.parse(content);
+    let result = await res.json();
+    let content = decodeURIComponent(escape(atob(result.content)));
+    return {
+      data: JSON.parse(content),
+      sha: result.sha
+    };
   } catch(e) {
-    // 如果 API 失败，降级到 list.json
-    try {
-      let res = await fetch('list.json');
-      return await res.json();
-    } catch(e2) {
-      alert('读取数据失败');
-      return [];
-    }
+    throw new Error('获取最新数据失败');
   }
 }
 
-// ===== 保存到 GitHub =====
+// ===== 保存到 GitHub（自动获取最新 sha）=====
 async function saveToGitHub(newData) {
   try {
+    // 先获取最新 sha
+    let latest = await getLatest();
+    
     let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     
-    // 获取当前文件的 sha
-    let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    let getData = await getRes.json();
-    let sha = getData.sha;
-    
-    // 写入新内容
     let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
       headers: { 
@@ -96,16 +87,17 @@ async function saveToGitHub(newData) {
       body: JSON.stringify({
         message: 'update list.json from web',
         content: content,
-        sha: sha
+        sha: latest.sha
       })
     });
     
     if (putRes.ok) {
-      data = newData;  // 更新本地数据
+      data = newData;
       renderAdmin();
       return true;
     } else {
-      alert('❌ GitHub 写入失败');
+      let err = await putRes.json();
+      alert('❌ 写入失败：' + (err.message || '未知错误'));
       return false;
     }
   } catch(e) {
@@ -170,14 +162,15 @@ document.getElementById('adminBtn').onclick = async function(e) {
       let r = await fetch('password.json');
       let pwd = await r.json();
       if (prompt('后台密码') === pwd.admin) {
-        // 进入后台前先加载最新数据
-        data = await loadFromGitHub();
+        // 进入后台前加载最新数据
+        let latest = await getLatest();
+        data = latest.data;
         document.getElementById('front').classList.add('hide');
         document.getElementById('adminView').classList.remove('hide');
         renderAdmin();
       } else alert('密码错误');
     } catch(e) {
-      alert('读取 password.json 失败');
+      alert('读取失败：' + e.message);
     }
     c = 0;
   }
@@ -211,7 +204,18 @@ document.getElementById('addBtn').onclick = async function() {
 
 // ===== 初始化：从 GitHub 加载 =====
 (async function init() {
-  data = await loadFromGitHub();
+  try {
+    let latest = await getLatest();
+    data = latest.data;
+  } catch(e) {
+    // 降级到 list.json
+    try {
+      let res = await fetch('list.json');
+      data = await res.json();
+    } catch(e2) {
+      alert('初始化失败');
+    }
+  }
 })();
 </script>
 </body>

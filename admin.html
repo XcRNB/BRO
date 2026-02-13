@@ -6,151 +6,154 @@
 <title>管理</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-body{background:#000;height:100vh;overflow:hidden;}
-.app{width:100vw;height:100vh;background:#fff;display:flex;flex-direction:column;padding:8px;overflow:hidden;}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-shrink:0;}
-.top h2{font-size:18px;}
-.btn{padding:6px 12px;border:2px solid #000;background:#fff;font-size:14px;font-weight:600;}
-.add{display:flex;gap:4px;margin-bottom:6px;flex-shrink:0;}
-.add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;min-width:0;}
-.add .btn{padding:10px 14px;background:#000;color:#fff;font-size:14px;white-space:nowrap;}
-.list{flex:1;overflow:hidden;}
-.list-inner{height:100%;overflow-y:auto;padding-right:2px;}
-.row{display:flex;gap:4px;margin-bottom:6px;}
-.row input{flex:1;padding:8px;border:2px solid #000;font-size:14px;min-width:0;}
-.row div{display:flex;gap:4px;flex-shrink:0;}
-.row .btn{padding:8px 10px;font-size:13px;}
+body{background:#000;height:100vh;overflow:hidden;display:flex;}
+.app{width:100vw;height:100vh;background:#fff;display:flex;flex-direction:column;padding:10px;}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.top h2{font-size:20px;}
+.btn{padding:8px 16px;border:2px solid #000;background:#fff;font-size:15px;}
+.add{display:flex;gap:5px;margin-bottom:8px;}
+.add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;}
+.add .btn{padding:10px 14px;background:#000;color:#fff;}
+.list{flex:1;overflow-y:auto;border:1px solid #ccc;padding:5px;}
+.row{display:flex;gap:5px;margin-bottom:6px;}
+.row input{flex:1;padding:8px;border:2px solid #000;font-size:14px;}
+.row div{display:flex;gap:5px;}
+.row .btn{padding:6px 10px;font-size:13px;}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="top">
-    <h2>管理</h2>
-    <button class="btn" id="backBtn">返回</button>
-  </div>
-  
-  <div class="add">
-    <input id="nid" placeholder="编号">
-    <input id="nnm" placeholder="姓名">
-    <input id="nps" placeholder="密码">
-    <button class="btn" id="addBtn">增</button>
-  </div>
-  
-  <div class="list">
-    <div class="list-inner" id="adminList"></div>
-  </div>
+    <div class="top">
+        <h2>管理</h2>
+        <button class="btn" id="backBtn">返回</button>
+    </div>
+    <div class="add">
+        <input id="nid" placeholder="编号">
+        <input id="nnm" placeholder="姓名">
+        <input id="nps" placeholder="密码">
+        <button class="btn" id="addBtn">增</button>
+    </div>
+    <div class="list" id="adminList"></div>
 </div>
-
 <script>
-const urlParams = new URLSearchParams(window.location.search);
-const owner = atob(urlParams.get('o'));
-const repo = atob(urlParams.get('r'));
-const token = atob(urlParams.get('t'));
-const path = 'list.json';
-let data = [];
-
-async function load() {
-  try {
-    let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    let res = await fetch(url, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    let result = await res.json();
-    let content = decodeURIComponent(escape(atob(result.content)));
-    data = JSON.parse(content);
-    render();
-  } catch(e) {
-    alert('读取失败');
-  }
-}
-
-async function save(newData) {
-  try {
-    let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
-    let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    let getData = await getRes.json();
-    let sha = getData.sha;
-    let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-      method: 'PUT',
-      headers: { 
-        'Authorization': `token ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: 'update',
-        content: content,
-        sha: sha
-      })
-    });
-    if (putRes.ok) {
-      data = newData;
-      render();
-    } else alert('写入失败');
-  } catch(e) {
-    alert('保存失败');
-  }
-}
-
-function render() {
-  let h = '';
-  data.forEach((v,i) => {
-    h += `<div class="row">
-      <input id="id_${i}" value="${v.id}">
-      <input id="name_${i}" value="${v.name}">
-      <input id="pass_${i}" value="${v.pass}">
-      <div>
-        <button class="btn" onclick="edit(${i})">存</button>
-        <button class="btn" onclick="del(${i})">删</button>
-      </div>
-    </div>`;
-  });
-  document.getElementById('adminList').innerHTML = h;
-}
-
-window.edit = async function(i) {
-  let id = document.getElementById(`id_${i}`).value;
-  let name = document.getElementById(`name_${i}`).value;
-  let pass = document.getElementById(`pass_${i}`).value;
-  if (id && name && pass) {
-    let newData = [...data];
-    newData[i] = {id, name, pass};
-    await save(newData);
-  }
-};
-
-window.del = async function(i) {
-  if (confirm('删？')) {
-    let newData = [...data];
-    newData.splice(i, 1);
-    await save(newData);
-  }
-};
-
-document.getElementById('addBtn').onclick = async function() {
-  let id = document.getElementById('nid').value;
-  let name = document.getElementById('nnm').value;
-  let pass = document.getElementById('nps').value;
-  if (id && name && pass) {
-    if (data.find(v => v.id === id)) { 
-      alert('已存在'); 
-      return; 
+    // 从URL参数读取（前台跳转时传过来的）
+    const urlParams = new URLSearchParams(window.location.search);
+    const owner = atob(urlParams.get('o') || '');
+    const repo = atob(urlParams.get('r') || '');
+    const token = atob(urlParams.get('t') || '');
+    const path = 'list.json';
+    
+    if (!owner || !repo || !token) {
+        alert('参数错误，请从前台进入');
     }
-    let newData = [...data];
-    newData.push({id, name, pass});
-    await save(newData);
-    document.getElementById('nid').value = '';
-    document.getElementById('nnm').value = '';
-    document.getElementById('nps').value = '';
-  }
-};
+    
+    let data = [];
 
-document.getElementById('backBtn').onclick = function() {
-  window.location.href = 'index.html';
-};
+    async function loadFromGitHub() {
+        try {
+            let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+            let res = await fetch(url, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            let result = await res.json();
+            let content = decodeURIComponent(escape(atob(result.content)));
+            data = JSON.parse(content);
+            renderList();
+        } catch(e) {
+            alert('读取失败，请检查网络或token权限');
+        }
+    }
 
-load();
+    async function saveToGitHub(newData) {
+        try {
+            let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+            let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            let getData = await getRes.json();
+            let sha = getData.sha;
+            let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': `token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'update',
+                    content: content,
+                    sha: sha
+                })
+            });
+            if (putRes.ok) {
+                data = newData;
+                renderList();
+                alert('✅');
+            } else {
+                alert('写入失败');
+            }
+        } catch(e) {
+            alert('保存失败');
+        }
+    }
+
+    function renderList() {
+        let h = '';
+        data.forEach((v,i) => {
+            h += `<div class="row">
+                <input id="id_${i}" value="${v.id}">
+                <input id="name_${i}" value="${v.name}">
+                <input id="pass_${i}" value="${v.pass}">
+                <div>
+                    <button class="btn" onclick="edit(${i})">存</button>
+                    <button class="btn" onclick="del(${i})">删</button>
+                </div>
+            </div>`;
+        });
+        document.getElementById('adminList').innerHTML = h;
+    }
+
+    window.edit = async function(i) {
+        let id = document.getElementById(`id_${i}`).value;
+        let name = document.getElementById(`name_${i}`).value;
+        let pass = document.getElementById(`pass_${i}`).value;
+        if (id && name && pass) {
+            let newData = [...data];
+            newData[i] = {id, name, pass};
+            await saveToGitHub(newData);
+        }
+    };
+
+    window.del = async function(i) {
+        if (confirm('删？')) {
+            let newData = [...data];
+            newData.splice(i, 1);
+            await saveToGitHub(newData);
+        }
+    };
+
+    document.getElementById('addBtn').onclick = async function() {
+        let id = document.getElementById('nid').value;
+        let name = document.getElementById('nnm').value;
+        let pass = document.getElementById('nps').value;
+        if (id && name && pass) {
+            if (data.find(v => v.id === id)) { 
+                alert('已存在'); 
+                return; 
+            }
+            let newData = [...data];
+            newData.push({id, name, pass});
+            await saveToGitHub(newData);
+            document.getElementById('nid').value = '';
+            document.getElementById('nnm').value = '';
+            document.getElementById('nps').value = '';
+        }
+    };
+
+    document.getElementById('backBtn').onclick = function() {
+        window.location.href = 'index.html';
+    };
+
+    loadFromGitHub();
 </script>
 </body>
 </html>

@@ -51,16 +51,39 @@ const repo = 'BRO';
 const path = 'list.json';
 const token = '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';
 
-// ===== 从 list.json 读取 =====
-async function loadFromFile() {
+// ===== 从 GitHub API 读取最新数据（前后台都用这个）=====
+async function loadFromGitHub() {
   try {
-    let res = await fetch('list.json?' + Date.now());
-    data = await res.json();
+    let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    let res = await fetch(url, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    
+    if (!res.ok) {
+      throw new Error('GitHub读取失败');
+    }
+    
+    let result = await res.json();
+    let content = decodeURIComponent(escape(atob(result.content)));
+    data = JSON.parse(content);
+    localStorage.setItem('backup', JSON.stringify(data));
     return true;
   } catch(e) {
-    console.log('读取list.json失败，使用空数据');
-    data = [];
-    return false;
+    // 失败时从备份读取
+    let backup = localStorage.getItem('backup');
+    if (backup) {
+      data = JSON.parse(backup);
+      return true;
+    }
+    // 最后从list.json读取
+    try {
+      let fileRes = await fetch('list.json?' + Date.now());
+      data = await fileRes.json();
+      return true;
+    } catch(e2) {
+      data = [];
+      return false;
+    }
   }
 }
 
@@ -69,20 +92,20 @@ async function saveToGitHub(newData) {
   try {
     let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     
-    // 获取当前文件的 sha
+    // 先获取最新 sha
     let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       headers: { 'Authorization': `token ${token}` }
     });
     
     if (!getRes.ok) {
-      alert('获取文件失败：' + getRes.status);
+      alert('获取文件失败');
       return false;
     }
     
     let getData = await getRes.json();
     let sha = getData.sha;
     
-    // 写入新内容
+    // 写入
     let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
       headers: { 
@@ -98,8 +121,16 @@ async function saveToGitHub(newData) {
     
     if (putRes.ok) {
       data = newData;
-      renderAdmin();
       localStorage.setItem('backup', JSON.stringify(newData));
+      renderAdmin();
+      
+      // 更新前台显示
+      let v = document.getElementById('key').value.trim();
+      let x = data.find(d => d.id === v);
+      document.getElementById('res').innerHTML = v 
+        ? x ? `<div>${x.name}</div><div>${x.pass}</div>` : '<div>无</div><div>-</div>'
+        : '<div>-</div><div>-</div>';
+      
       alert('✅ 保存成功');
       return true;
     } else {
@@ -147,6 +178,7 @@ window.delItem = async function(i) {
   }
 };
 
+// 前台查询（每次从 data 读取）
 document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
@@ -155,6 +187,7 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
+// 后台登录
 let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault(); c++;
@@ -163,12 +196,7 @@ document.getElementById('adminBtn').onclick = async function(e) {
       let r = await fetch('password.json?' + Date.now());
       let pwd = await r.json();
       if (prompt('后台密码') === pwd.admin) {
-        let backup = localStorage.getItem('backup');
-        if (backup) {
-          data = JSON.parse(backup);
-        } else {
-          await loadFromFile();
-        }
+        await loadFromGitHub();  // 进入后台前从GitHub读取最新
         document.getElementById('front').classList.add('hide');
         document.getElementById('adminView').classList.remove('hide');
         renderAdmin();
@@ -204,7 +232,8 @@ document.getElementById('addBtn').onclick = async function() {
   }
 };
 
-loadFromFile();
+// 初始化：前台从GitHub读取
+loadFromGitHub();
 </script>
 </body>
 </html>

@@ -1,1 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BRO · 管理端</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
+body{background:#000;padding:8px;}
+.app{background:#fff;border:2px solid #000;padding:16px;max-width:500px;margin:0 auto;}
+.top{display:flex;justify-content:space-between;margin-bottom:16px;}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.row input{flex:1;border:2px solid #000;padding:10px;}
+.row div{display:flex;gap:5px;}
+.btn{border:2px solid #000;padding:8px 14px;background:#fff;font-weight:600;}
+.btn-dark{background:#000;color:#fff;}
+.addgroup{display:flex;gap:6px;margin-top:20px;}
+.addgroup input{flex:1;border:2px solid #000;padding:12px;}
+#adminList{margin-bottom:20px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><h2>BRO · 管理</h2><button class="btn" id="backBtn">返回查询</button></div>
+  <div id="adminList"></div>
+  <div class="addgroup">
+    <input id="nid" placeholder="编号">
+    <input id="nnm" placeholder="姓名">
+    <input id="nps" placeholder="密码">
+    <button class="btn btn-dark" id="addBtn">增</button>
+  </div>
+</div>
 
+<script>
+// 从URL获取参数
+const urlParams = new URLSearchParams(window.location.search);
+const owner = urlParams.get('owner');
+const repo = urlParams.get('repo');
+const token = urlParams.get('token');
+const path = 'list.json';
+
+let data = [];
+
+// 从GitHub读取
+async function loadFromGitHub() {
+  try {
+    let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    let res = await fetch(url, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    let result = await res.json();
+    let content = decodeURIComponent(escape(atob(result.content)));
+    data = JSON.parse(content);
+    renderAdmin();
+  } catch(e) {
+    alert('读取失败');
+  }
+}
+
+// 保存到GitHub
+async function saveToGitHub(newData) {
+  try {
+    let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+    
+    let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    let getData = await getRes.json();
+    let sha = getData.sha;
+    
+    let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: { 
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'update from admin',
+        content: content,
+        sha: sha
+      })
+    });
+    
+    if (putRes.ok) {
+      data = newData;
+      renderAdmin();
+      alert('✅ 保存成功');
+    } else {
+      alert('写入失败');
+    }
+  } catch(e) {
+    alert('保存失败');
+  }
+}
+
+function renderAdmin() {
+  let h = '';
+  data.forEach((v,i) => {
+    h += `<div class="row">
+      <input id="id_${i}" value="${v.id}">
+      <input id="name_${i}" value="${v.name}">
+      <input id="pass_${i}" value="${v.pass}">
+      <div>
+        <button class="btn" onclick="editItem(${i})">存</button>
+        <button class="btn" onclick="delItem(${i})">删</button>
+      </div>
+    </div>`;
+  });
+  document.getElementById('adminList').innerHTML = h;
+}
+
+window.editItem = async function(i) {
+  let id = document.getElementById(`id_${i}`).value;
+  let name = document.getElementById(`name_${i}`).value;
+  let pass = document.getElementById(`pass_${i}`).value;
+  if (id && name && pass) {
+    let newData = [...data];
+    newData[i] = {id, name, pass};
+    await saveToGitHub(newData);
+  }
+};
+
+window.delItem = async function(i) {
+  if (confirm('确认删除？')) {
+    let newData = [...data];
+    newData.splice(i, 1);
+    await saveToGitHub(newData);
+  }
+};
+
+document.getElementById('addBtn').onclick = async function() {
+  let id = document.getElementById('nid').value;
+  let name = document.getElementById('nnm').value;
+  let pass = document.getElementById('nps').value;
+  if (id && name && pass) {
+    if (data.find(v => v.id === id)) { 
+      alert('编号已存在'); 
+      return; 
+    }
+    let newData = [...data];
+    newData.push({id, name, pass});
+    await saveToGitHub(newData);
+    document.getElementById('nid').value = '';
+    document.getElementById('nnm').value = '';
+    document.getElementById('nps').value = '';
+  }
+};
+
+document.getElementById('backBtn').onclick = function() {
+  window.location.href = 'index.html';
+};
+
+loadFromGitHub();
+</script>
+</body>
+</html>

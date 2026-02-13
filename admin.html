@@ -10,32 +10,34 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
 .app{width:100vw;height:100vh;background:#fff;display:flex;flex-direction:column;padding:10px;}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .top h2{font-size:20px;}
-.btn{padding:8px 16px;border:2px solid #000;background:#fff;font-size:15px;font-weight:600;}
+.btn{padding:8px 16px;border:2px solid #000;background:#fff;font-size:15px;font-weight:600;cursor:pointer;}
 .add{display:flex;gap:5px;margin-bottom:8px;}
 .add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;}
 .add .btn{padding:10px 14px;background:#000;color:#fff;}
 .list{flex:1;overflow-y:auto;border:1px solid #ccc;padding:5px;}
-.row{display:flex;gap:5px;margin-bottom:6px;}
+.row{display:flex;gap:5px;margin-bottom:6px;align-items:center;}
 .row input{flex:1;padding:8px;border:2px solid #000;font-size:14px;}
-.row div{display:flex;gap:5px;}
+.row div{display:flex;gap:5px;flex-shrink:0;}
 .row .btn{padding:6px 10px;font-size:13px;}
 </style>
 </head>
 <body>
 <div class="app">
     <div class="top">
-        <h2>管理</h2>
+        <h2>管理后台</h2>
         <button class="btn" id="backBtn">返回</button>
     </div>
     <div class="add">
         <input id="nid" placeholder="编号">
         <input id="nnm" placeholder="姓名">
         <input id="nps" placeholder="密码">
-        <button class="btn" id="addBtn">增</button>
+        <button class="btn" id="addBtn">增加</button>
     </div>
     <div class="list" id="adminList"></div>
 </div>
+
 <script>
+    // 从URL获取参数
     const urlParams = new URLSearchParams(window.location.search);
     const owner = urlParams.get('o') ? atob(urlParams.get('o')) : '';
     const repo = urlParams.get('r') ? atob(urlParams.get('r')) : '';
@@ -48,6 +50,7 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
     
     let data = [];
 
+    // 从GitHub读取数据
     async function loadFromGitHub() {
         try {
             let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
@@ -60,18 +63,23 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
             data = JSON.parse(content);
             renderList();
         } catch(e) {
-            alert('读取失败，请检查网络或token权限');
+            alert('读取失败：' + e.message);
         }
     }
 
+    // 保存到GitHub
     async function saveToGitHub(newData) {
         try {
             let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+            
+            // 获取当前文件信息（含sha）
             let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
                 headers: { 'Authorization': `token ${token}` }
             });
             let getData = await getRes.json();
             let sha = getData.sha;
+
+            // 写入新内容
             let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
                 method: 'PUT',
                 headers: { 
@@ -79,66 +87,73 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: 'update',
+                    message: 'update from admin',
                     content: content,
                     sha: sha
                 })
             });
+
             if (putRes.ok) {
                 data = newData;
                 renderList();
-                alert('✅');
+                alert('✅ 保存成功');
             } else {
                 alert('写入失败');
             }
         } catch(e) {
-            alert('保存失败');
+            alert('保存失败：' + e.message);
         }
     }
 
+    // 渲染列表
     function renderList() {
-        let h = '';
-        data.forEach((v,i) => {
-            h += `<div class="row">
-                <input id="id_${i}" value="${v.id}">
-                <input id="name_${i}" value="${v.name}">
-                <input id="pass_${i}" value="${v.pass}">
+        let html = '';
+        data.forEach((item, index) => {
+            html += `<div class="row">
+                <input id="id_${index}" value="${item.id}">
+                <input id="name_${index}" value="${item.name}">
+                <input id="pass_${index}" value="${item.pass}">
                 <div>
-                    <button class="btn" onclick="edit(${i})">存</button>
-                    <button class="btn" onclick="del(${i})">删</button>
+                    <button class="btn" onclick="editItem(${index})">存</button>
+                    <button class="btn" onclick="delItem(${index})">删</button>
                 </div>
             </div>`;
         });
-        document.getElementById('adminList').innerHTML = h;
+        document.getElementById('adminList').innerHTML = html;
     }
 
-    window.edit = async function(i) {
-        let id = document.getElementById(`id_${i}`).value;
-        let name = document.getElementById(`name_${i}`).value;
-        let pass = document.getElementById(`pass_${i}`).value;
+    // 编辑
+    window.editItem = async function(index) {
+        let id = document.getElementById(`id_${index}`).value.trim();
+        let name = document.getElementById(`name_${index}`).value.trim();
+        let pass = document.getElementById(`pass_${index}`).value.trim();
         if (id && name && pass) {
             let newData = [...data];
-            newData[i] = {id, name, pass};
+            newData[index] = {id, name, pass};
             await saveToGitHub(newData);
+        } else {
+            alert('请填写完整');
         }
     };
 
-    window.del = async function(i) {
-        if (confirm('删？')) {
+    // 删除
+    window.delItem = async function(index) {
+        if (confirm('确定删除？')) {
             let newData = [...data];
-            newData.splice(i, 1);
+            newData.splice(index, 1);
             await saveToGitHub(newData);
         }
     };
 
+    // 增加
     document.getElementById('addBtn').onclick = async function() {
         let id = document.getElementById('nid').value.trim();
         let name = document.getElementById('nnm').value.trim();
         let pass = document.getElementById('nps').value.trim();
         if (id && name && pass) {
-            if (data.find(v => v.id === id)) { 
-                alert('已存在'); 
-                return; 
+            if (data.find(v => v.id === id)) {
+                alert('编号已存在');
+                return;
             }
             let newData = [...data];
             newData.push({id, name, pass});
@@ -146,13 +161,17 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
             document.getElementById('nid').value = '';
             document.getElementById('nnm').value = '';
             document.getElementById('nps').value = '';
+        } else {
+            alert('请填写完整');
         }
     };
 
+    // 返回前台
     document.getElementById('backBtn').onclick = function() {
         window.location.href = 'index.html';
     };
 
+    // 启动
     loadFromGitHub();
 </script>
 </body>

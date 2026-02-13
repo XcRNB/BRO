@@ -11,15 +11,15 @@ body{background:#000;height:100vh;overflow:hidden;}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-shrink:0;}
 .top h2{font-size:18px;}
 .btn{padding:6px 12px;border:2px solid #000;background:#fff;font-size:14px;font-weight:600;}
-.list{flex:1;overflow:hidden;margin-bottom:6px;}
+.add{display:flex;gap:4px;margin-bottom:6px;flex-shrink:0;}
+.add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;min-width:0;}
+.add .btn{padding:10px 14px;background:#000;color:#fff;font-size:14px;white-space:nowrap;}
+.list{flex:1;overflow:hidden;}
 .list-inner{height:100%;overflow-y:auto;padding-right:2px;}
 .row{display:flex;gap:4px;margin-bottom:6px;}
 .row input{flex:1;padding:8px;border:2px solid #000;font-size:14px;min-width:0;}
 .row div{display:flex;gap:4px;flex-shrink:0;}
 .row .btn{padding:8px 10px;font-size:13px;}
-.add{display:flex;gap:4px;padding-top:6px;border-top:2px solid #000;flex-shrink:0;}
-.add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;min-width:0;}
-.add .btn{padding:10px 14px;background:#000;color:#fff;font-size:14px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -28,14 +28,16 @@ body{background:#000;height:100vh;overflow:hidden;}
     <h2>管理</h2>
     <button class="btn" id="backBtn">返回</button>
   </div>
-  <div class="list">
-    <div class="list-inner" id="adminList"></div>
-  </div>
+  
   <div class="add">
     <input id="nid" placeholder="编号">
     <input id="nnm" placeholder="姓名">
     <input id="nps" placeholder="密码">
     <button class="btn" id="addBtn">增</button>
+  </div>
+  
+  <div class="list">
+    <div class="list-inner" id="adminList"></div>
   </div>
 </div>
 

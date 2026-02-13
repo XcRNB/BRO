@@ -6,30 +6,38 @@
 <title>BRO · 管理</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-body{background:#000;padding:6px;}
-.app{background:#fff;border:1.5px solid #000;padding:12px;max-width:480px;margin:0 auto;}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+body{background:#000;padding:0;height:100vh;display:flex;align-items:center;}
+.app{width:100%;height:100vh;background:#fff;border-left:2px solid #000;border-right:2px solid #000;display:flex;flex-direction:column;padding:10px;}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0;}
 .top h2{font-size:18px;}
 .btn{border:1.5px solid #000;padding:4px 8px;background:#fff;font-weight:500;font-size:13px;}
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.listarea{flex:1;overflow-y:auto;margin-bottom:8px;padding-right:2px;}
 .row{display:flex;align-items:center;gap:4px;margin-bottom:6px;}
-.row input{flex:1;border:1.5px solid #000;padding:6px;font-size:13px;}
-.row div{display:flex;gap:3px;}
-.row .btn{padding:4px 6px;font-size:12px;}
-.addgroup{display:flex;gap:4px;margin-top:12px;}
-.addgroup input{flex:1;border:1.5px solid #000;padding:8px;font-size:13px;}
-.btn-dark{background:#000;color:#fff;padding:8px 10px;font-size:13px;}
-#adminList{margin-bottom:12px;max-height:50vh;overflow-y:auto;}
+.row input{flex:1;border:1.5px solid #000;padding:8px;font-size:14px;}
+.row div{display:flex;gap:3px;flex-shrink:0;}
+.row .btn{padding:6px 8px;font-size:12px;}
+.addgroup{display:flex;gap:4px;flex-shrink:0;padding-top:4px;border-top:1px solid #000;}
+.addgroup input{flex:1;border:1.5px solid #000;padding:10px;font-size:14px;}
+.btn-dark{background:#000;color:#fff;padding:10px 12px;font-size:14px;border:1.5px solid #000;}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="top"><h2>管理</h2><button class="btn" id="backBtn">返回</button></div>
-  <div id="adminList"></div>
-  <div class="addgroup">
-    <input id="nid" placeholder="编号">
-    <input id="nnm" placeholder="姓名">
-    <input id="nps" placeholder="密码">
-    <button class="btn-dark" id="addBtn">增</button>
+  <div class="top">
+    <h2>管理</h2>
+    <button class="btn" id="backBtn">返回</button>
+  </div>
+  
+  <div class="content">
+    <div class="listarea" id="adminList"></div>
+    
+    <div class="addgroup">
+      <input id="nid" placeholder="编号">
+      <input id="nnm" placeholder="姓名">
+      <input id="nps" placeholder="密码">
+      <button class="btn-dark" id="addBtn">增</button>
+    </div>
   </div>
 </div>
 

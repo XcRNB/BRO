@@ -49,16 +49,16 @@ let data = [];
 const owner = 'XcRNB';
 const repo = 'BRO';
 const path = 'list.json';
-const token = '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';
+const token = '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';
 
-// ===== 直接从 list.json 读取（不用 API）=====
+// ===== 从 list.json 读取 =====
 async function loadFromFile() {
   try {
-    let res = await fetch('list.json?' + Date.now()); // 加时间戳防缓存
+    let res = await fetch('list.json?' + Date.now());
     data = await res.json();
     return true;
   } catch(e) {
-    alert('读取 list.json 失败');
+    console.log('读取list.json失败，使用空数据');
     data = [];
     return false;
   }
@@ -69,14 +69,13 @@ async function saveToGitHub(newData) {
   try {
     let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     
-    // 先获取当前文件的 sha
+    // 获取当前文件的 sha
     let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       headers: { 'Authorization': `token ${token}` }
     });
     
     if (!getRes.ok) {
-      let err = await getRes.json();
-      alert('获取文件失败：' + (err.message || '未知错误'));
+      alert('获取文件失败：' + getRes.status);
       return false;
     }
     
@@ -91,7 +90,7 @@ async function saveToGitHub(newData) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        message: 'update list.json from web',
+        message: 'update list.json',
         content: content,
         sha: sha
       })
@@ -100,13 +99,11 @@ async function saveToGitHub(newData) {
     if (putRes.ok) {
       data = newData;
       renderAdmin();
-      // 同时更新 list.json 缓存（下次读取用）
-      localStorage.setItem('backup_data', JSON.stringify(newData));
+      localStorage.setItem('backup', JSON.stringify(newData));
       alert('✅ 保存成功');
       return true;
     } else {
-      let err = await putRes.json();
-      alert('写入失败：' + (err.message || '未知错误'));
+      alert('写入失败');
       return false;
     }
   } catch(e) {
@@ -115,7 +112,6 @@ async function saveToGitHub(newData) {
   }
 }
 
-// ===== 渲染后台 =====
 function renderAdmin() {
   let h = '';
   data.forEach((v,i) => {
@@ -132,7 +128,6 @@ function renderAdmin() {
   document.getElementById('adminList').innerHTML = h;
 }
 
-// ===== 编辑 =====
 window.editItem = async function(i) {
   let id = document.getElementById(`id_${i}`).value;
   let name = document.getElementById(`name_${i}`).value;
@@ -144,7 +139,6 @@ window.editItem = async function(i) {
   }
 };
 
-// ===== 删除 =====
 window.delItem = async function(i) {
   if (confirm('确认删除？')) {
     let newData = [...data];
@@ -153,7 +147,6 @@ window.delItem = async function(i) {
   }
 };
 
-// ===== 查询 =====
 document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
@@ -162,7 +155,6 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
-// ===== 后台登录 =====
 let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault(); c++;
@@ -171,8 +163,7 @@ document.getElementById('adminBtn').onclick = async function(e) {
       let r = await fetch('password.json?' + Date.now());
       let pwd = await r.json();
       if (prompt('后台密码') === pwd.admin) {
-        // 先尝试从备份读取，没有再从文件读
-        let backup = localStorage.getItem('backup_data');
+        let backup = localStorage.getItem('backup');
         if (backup) {
           data = JSON.parse(backup);
         } else {
@@ -189,14 +180,12 @@ document.getElementById('adminBtn').onclick = async function(e) {
   }
 };
 
-// ===== 返回前台 =====
 document.getElementById('backBtn').onclick = function(e) {
   e.preventDefault();
   document.getElementById('adminView').classList.add('hide');
   document.getElementById('front').classList.remove('hide');
 };
 
-// ===== 增加 =====
 document.getElementById('addBtn').onclick = async function() {
   let id = document.getElementById('nid').value;
   let name = document.getElementById('nnm').value;
@@ -215,7 +204,6 @@ document.getElementById('addBtn').onclick = async function() {
   }
 };
 
-// ===== 初始化 =====
 loadFromFile();
 </script>
 </body>

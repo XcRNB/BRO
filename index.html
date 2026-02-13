@@ -2,55 +2,52 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>BRO · 查询端</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
-body{background:#000;padding:8px;}
-.app{background:#fff;border:2px solid #000;padding:16px;max-width:500px;margin:0 auto;}
-.top{display:flex;justify-content:space-between;margin-bottom:16px;}
-#key{width:100%;padding:14px;font-size:18px;border:2px solid #000;margin-bottom:16px;}
-.show{border:2px solid #000;padding:20px;text-align:center;margin-bottom:20px;}
-.show div:first-child{font-size:40px;font-weight:700;}
-.show div:last-child{font-size:32px;font-family:monospace;}
+body{background:#000;min-height:100vh;display:flex;align-items:center;padding:0;}
+.app{width:100%;background:#fff;border:2px solid #000;min-height:100vh;display:flex;flex-direction:column;}
+.content{flex:1;padding:20px;display:flex;flex-direction:column;}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.top h2{font-size:28px;}
+#adminBtn{border:2px solid #000;padding:12px 24px;background:#fff;font-weight:600;font-size:18px;width:100px;}
+#key{width:100%;padding:20px;font-size:24px;border:2px solid #000;margin-bottom:25px;}
+.show{border:2px solid #000;padding:30px;text-align:center;margin-bottom:25px;flex:1;display:flex;flex-direction:column;justify-content:center;}
+.show div:first-child{font-size:56px;font-weight:700;margin-bottom:15px;}
+.show div:last-child{font-size:48px;font-family:monospace;word-break:break-all;}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="top"><h2>BRO · 查号</h2><button class="btn" id="adminBtn" style="border:2px solid #000;padding:8px 14px;background:#fff;font-weight:600;">后台</button></div>
-  <input id="key" placeholder="编号" autofocus>
-  <div class="show" id="res"><div>-</div><div>-</div></div>
+  <div class="content">
+    <div class="top"><h2>BRO</h2><button class="btn" id="adminBtn">后台</button></div>
+    <input id="key" placeholder="编号" autofocus>
+    <div class="show" id="res"><div>-</div><div>-</div></div>
+  </div>
 </div>
 
 <script>
 let data = [];
 let owner = '', repo = '', token = '', path = 'list.json';
 
-// 从important.json读取敏感信息
 async function loadImportant() {
   try {
     let res = await fetch('important.json?' + Date.now());
-    if (!res.ok) {
-      throw new Error('文件不存在 (HTTP ' + res.status + ')');
-    }
+    if (!res.ok) throw new Error('文件不存在');
     let imp = await res.json();
     owner = imp.owner;
     repo = imp.repo;
     token = imp.token;
-    console.log('important.json 读取成功');
     return true;
   } catch(e) {
-    alert('读取important.json失败：' + e.message + '\n\n请确认文件已上传到仓库');
+    alert('读取important.json失败');
     return false;
   }
 }
 
-// 从GitHub读取数据
 async function loadFromGitHub() {
-  if (!owner || !repo || !token) {
-    console.log('敏感信息未加载');
-    return;
-  }
+  if (!owner || !repo || !token) return;
   try {
     let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
     let res = await fetch(url, {
@@ -76,7 +73,6 @@ async function loadFromGitHub() {
   }
 }
 
-// 查询
 document.getElementById('key').oninput = function() {
   let v = this.value.trim();
   let x = data.find(d => d.id === v);
@@ -85,37 +81,29 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
-// 卡密验证并跳转后台
 let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault();
   c++;
   if (c === 3) {
+    let loaded = await loadImportant();
+    if (!loaded) return;
     try {
-      // 先加载important.json
-      let loaded = await loadImportant();
-      if (!loaded) return;
-      
-      // 读取密码
       let pwdRes = await fetch('password.json?' + Date.now());
       let pwd = await pwdRes.json();
       if (prompt('后台密码') === pwd.admin) {
-        // 编码后跳转
         let encodedOwner = btoa(owner);
         let encodedRepo = btoa(repo);
         let encodedToken = btoa(token);
         window.location.href = 'admin.html?o=' + encodedOwner + '&r=' + encodedRepo + '&t=' + encodedToken;
-      } else {
-        alert('密码错误');
-      }
+      } else alert('密码错误');
     } catch(e) {
-      alert('读取密码失败：' + e.message);
+      alert('读取密码失败');
     }
     c = 0;
   }
 };
 
-// 初始化：先加载important，再加载数据
 (async function init() {
   await loadImportant();
   await loadFromGitHub();

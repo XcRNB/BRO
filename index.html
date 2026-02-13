@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>BRO · 查询端</title>
+<title>BRO · 查询</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui;}
 body{background:#000;min-height:100vh;display:flex;align-items:center;padding:0;}
@@ -29,7 +29,10 @@ body{background:#000;min-height:100vh;display:flex;align-items:center;padding:0;
 
 <script>
 let data = [];
-let owner = '', repo = '', token = '', path = 'list.json';
+let owner = '', repo = '', path = 'list.json';
+
+// Token 从环境变量读取（Vercel 自动替换）
+const token = '__GITHUB_TOKEN__';
 
 async function loadImportant() {
   try {
@@ -38,7 +41,6 @@ async function loadImportant() {
     let imp = await res.json();
     owner = imp.owner;
     repo = imp.repo;
-    token = imp.token;
     return true;
   } catch(e) {
     alert('读取important.json失败');
@@ -85,7 +87,7 @@ let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault();
   c++;
-  if (c === 1) {
+  if (c === 3) {
     let loaded = await loadImportant();
     if (!loaded) return;
     try {

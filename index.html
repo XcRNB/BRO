@@ -41,7 +41,6 @@ body{background:#000;padding:8px;}
       <input id="nps" placeholder="密码">
       <button class="btn btn-dark" id="addBtn">增</button>
     </div>
-    <p style="color:#00c;font-size:13px;margin-top:15px;text-align:center;">✅ 每次操作自动获取最新sha</p>
   </div>
 </div>
 
@@ -52,32 +51,39 @@ const repo = 'BRO';
 const path = 'list.json';
 const token = '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';
 
-// ===== 获取最新文件内容和 sha =====
-async function getLatest() {
+// ===== 直接从 list.json 读取（不用 API）=====
+async function loadFromFile() {
   try {
-    let url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    let res = await fetch(url, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    let result = await res.json();
-    let content = decodeURIComponent(escape(atob(result.content)));
-    return {
-      data: JSON.parse(content),
-      sha: result.sha
-    };
+    let res = await fetch('list.json?' + Date.now()); // 加时间戳防缓存
+    data = await res.json();
+    return true;
   } catch(e) {
-    throw new Error('获取最新数据失败');
+    alert('读取 list.json 失败');
+    data = [];
+    return false;
   }
 }
 
-// ===== 保存到 GitHub（自动获取最新 sha）=====
+// ===== 保存到 GitHub =====
 async function saveToGitHub(newData) {
   try {
-    // 先获取最新 sha
-    let latest = await getLatest();
-    
     let content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     
+    // 先获取当前文件的 sha
+    let getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    
+    if (!getRes.ok) {
+      let err = await getRes.json();
+      alert('获取文件失败：' + (err.message || '未知错误'));
+      return false;
+    }
+    
+    let getData = await getRes.json();
+    let sha = getData.sha;
+    
+    // 写入新内容
     let putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
       headers: { 
@@ -87,21 +93,24 @@ async function saveToGitHub(newData) {
       body: JSON.stringify({
         message: 'update list.json from web',
         content: content,
-        sha: latest.sha
+        sha: sha
       })
     });
     
     if (putRes.ok) {
       data = newData;
       renderAdmin();
+      // 同时更新 list.json 缓存（下次读取用）
+      localStorage.setItem('backup_data', JSON.stringify(newData));
+      alert('✅ 保存成功');
       return true;
     } else {
       let err = await putRes.json();
-      alert('❌ 写入失败：' + (err.message || '未知错误'));
+      alert('写入失败：' + (err.message || '未知错误'));
       return false;
     }
   } catch(e) {
-    alert('❌ 保存失败：' + e.message);
+    alert('保存失败：' + e.message);
     return false;
   }
 }
@@ -159,18 +168,22 @@ document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault(); c++;
   if (c === 3) {
     try {
-      let r = await fetch('password.json');
+      let r = await fetch('password.json?' + Date.now());
       let pwd = await r.json();
       if (prompt('后台密码') === pwd.admin) {
-        // 进入后台前加载最新数据
-        let latest = await getLatest();
-        data = latest.data;
+        // 先尝试从备份读取，没有再从文件读
+        let backup = localStorage.getItem('backup_data');
+        if (backup) {
+          data = JSON.parse(backup);
+        } else {
+          await loadFromFile();
+        }
         document.getElementById('front').classList.add('hide');
         document.getElementById('adminView').classList.remove('hide');
         renderAdmin();
       } else alert('密码错误');
     } catch(e) {
-      alert('读取失败：' + e.message);
+      alert('读取 password.json 失败');
     }
     c = 0;
   }
@@ -202,21 +215,8 @@ document.getElementById('addBtn').onclick = async function() {
   }
 };
 
-// ===== 初始化：从 GitHub 加载 =====
-(async function init() {
-  try {
-    let latest = await getLatest();
-    data = latest.data;
-  } catch(e) {
-    // 降级到 list.json
-    try {
-      let res = await fetch('list.json');
-      data = await res.json();
-    } catch(e2) {
-      alert('初始化失败');
-    }
-  }
-})();
+// ===== 初始化 =====
+loadFromFile();
 </script>
 </body>
 </html>

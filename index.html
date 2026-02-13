@@ -31,7 +31,7 @@ body{background:#000;min-height:100vh;display:flex;align-items:center;padding:0;
 let data = [];
 let owner = '', repo = '', path = 'list.json';
 
-// Token 从环境变量读取（Vercel 自动替换）
+// token 从环境变量读取（Vercel 自动替换）
 const token = '__GITHUB_TOKEN__';
 
 async function loadImportant() {
@@ -43,7 +43,7 @@ async function loadImportant() {
     repo = imp.repo;
     return true;
   } catch(e) {
-    alert('读取important.json失败');
+    alert('读取 important.json 失败');
     return false;
   }
 }

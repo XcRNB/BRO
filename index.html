@@ -85,7 +85,7 @@ let c = 0;
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault();
   c++;
-  if (c === 3) {
+  if (c === 1) {
     let loaded = await loadImportant();
     if (!loaded) return;
     try {

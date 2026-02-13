@@ -10,7 +10,7 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
 .app{width:100vw;height:100vh;background:#fff;display:flex;flex-direction:column;padding:10px;}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .top h2{font-size:20px;}
-.btn{padding:8px 16px;border:2px solid #000;background:#fff;font-size:15px;}
+.btn{padding:8px 16px;border:2px solid #000;background:#fff;font-size:15px;font-weight:600;}
 .add{display:flex;gap:5px;margin-bottom:8px;}
 .add input{flex:1;padding:10px;border:2px solid #000;font-size:14px;}
 .add .btn{padding:10px 14px;background:#000;color:#fff;}
@@ -36,11 +36,10 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
     <div class="list" id="adminList"></div>
 </div>
 <script>
-    // 从URL参数读取（前台跳转时传过来的）
     const urlParams = new URLSearchParams(window.location.search);
-    const owner = atob(urlParams.get('o') || '');
-    const repo = atob(urlParams.get('r') || '');
-    const token = atob(urlParams.get('t') || '');
+    const owner = urlParams.get('o') ? atob(urlParams.get('o')) : '';
+    const repo = urlParams.get('r') ? atob(urlParams.get('r')) : '';
+    const token = urlParams.get('t') ? atob(urlParams.get('t')) : '';
     const path = 'list.json';
     
     if (!owner || !repo || !token) {
@@ -55,6 +54,7 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
             let res = await fetch(url, {
                 headers: { 'Authorization': `token ${token}` }
             });
+            if (!res.ok) throw new Error('GitHub读取失败');
             let result = await res.json();
             let content = decodeURIComponent(escape(atob(result.content)));
             data = JSON.parse(content);
@@ -132,9 +132,9 @@ body{background:#000;height:100vh;overflow:hidden;display:flex;}
     };
 
     document.getElementById('addBtn').onclick = async function() {
-        let id = document.getElementById('nid').value;
-        let name = document.getElementById('nnm').value;
-        let pass = document.getElementById('nps').value;
+        let id = document.getElementById('nid').value.trim();
+        let name = document.getElementById('nnm').value.trim();
+        let pass = document.getElementById('nps').value.trim();
         if (id && name && pass) {
             if (data.find(v => v.id === id)) { 
                 alert('已存在'); 

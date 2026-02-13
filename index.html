@@ -30,8 +30,6 @@ body{background:#000;min-height:100vh;display:flex;align-items:center;padding:0;
 <script>
 let data = [];
 let owner = '', repo = '', path = 'list.json';
-
-// token 从环境变量读取（Vercel 自动替换）
 const token = '__GITHUB_TOKEN__';
 
 async function loadImportant() {
@@ -83,26 +81,22 @@ document.getElementById('key').oninput = function() {
     : '<div>-</div><div>-</div>';
 };
 
-let c = 0;
+// 修改为点击一次即可
 document.getElementById('adminBtn').onclick = async function(e) {
   e.preventDefault();
-  c++;
-  if (c === 3) {
-    let loaded = await loadImportant();
-    if (!loaded) return;
-    try {
-      let pwdRes = await fetch('password.json?' + Date.now());
-      let pwd = await pwdRes.json();
-      if (prompt('后台密码') === pwd.admin) {
-        let encodedOwner = btoa(owner);
-        let encodedRepo = btoa(repo);
-        let encodedToken = btoa(token);
-        window.location.href = 'admin.html?o=' + encodedOwner + '&r=' + encodedRepo + '&t=' + encodedToken;
-      } else alert('密码错误');
-    } catch(e) {
-      alert('读取密码失败');
-    }
-    c = 0;
+  let loaded = await loadImportant();
+  if (!loaded) return;
+  try {
+    let pwdRes = await fetch('password.json?' + Date.now());
+    let pwd = await pwdRes.json();
+    if (prompt('后台密码') === pwd.admin) {
+      let encodedOwner = btoa(owner);
+      let encodedRepo = btoa(repo);
+      let encodedToken = btoa(token);
+      window.location.href = 'admin.html?o=' + encodedOwner + '&r=' + encodedRepo + '&t=' + encodedToken;
+    } else alert('密码错误');
+  } catch(e) {
+    alert('读取密码失败');
   }
 };
 

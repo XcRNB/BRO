@@ -1,23 +1,26 @@
 {
   "builds": [
     {
-      "src": "api/*.py",
+      "src": "api/index.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/verify",
-      "dest": "api/verify.py"
+      "dest": "api/index.py"
     },
     {
       "src": "/heartbeat",
-      "dest": "api/heartbeat.py"
+      "dest": "api/index.py"
     },
     {
       "src": "/",
-      "dest": "api/verify.py"
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/ping",
+      "dest": "api/index.py"
     }
   ]
 }
-app = app

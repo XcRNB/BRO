@@ -1,20 +1,51 @@
 from flask import Flask, request, jsonify
 import time
 import os
-import hashlib
 import jwt
-import redis
+import urllib.request
+import json
 
 app = Flask(__name__)
 
 SECRET_KEY = os.environ.get('SECRET_KEY', '8x7k3m9p2q5w1v4r6t8y2u4i7o0p9a3s')
 
-# Redis 连接
-redis_client = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:6379'))
+# Upstash REST API
+REDIS_REST_URL = os.environ.get('UPSTASH_REDIS_REST_URL', '')
+REDIS_REST_TOKEN = os.environ.get('UPSTASH_REDIS_REST_TOKEN', '')
+
+def redis_get(key):
+    url = f"{REDIS_REST_URL}/get/{key}"
+    req = urllib.request.Request(
+        url,
+        headers={'Authorization': f'Bearer {REDIS_REST_TOKEN}'}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            return data.get('result')
+    except:
+        return None
+
+def redis_setex(key, seconds, value):
+    url = f"{REDIS_REST_URL}/setex/{key}/{seconds}"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(value).encode(),
+        headers={
+            'Authorization': f'Bearer {REDIS_REST_TOKEN}',
+            'Content-Type': 'application/json'
+        },
+        method='POST'
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except:
+        return False
 
 # 有效卡密列表
 valid_keys = {
-    "XcRNG": {"expiry": 1900000000},  # 2030年过期，绝对不会报过期
+    "XcRNG": {"expiry": 1900000000},  # 2030年过期
 }
 
 def create_verification_token(user_id, card_key):
@@ -43,19 +74,17 @@ def verify_get():
     if valid_keys[card_key]['expiry'] < current_time:
         return jsonify({'success': False, 'message': '卡密已过期'})
     
-    # 检查是否已使用
     used_key = f"used:{card_key}"
-    existing_user = redis_client.get(used_key)
+    existing_user = redis_get(used_key)
     
     if existing_user:
-        if existing_user.decode() != user_id:
+        if existing_user != user_id:
             return jsonify({'success': False, 'message': '卡密已被其他用户使用'})
         else:
             token = create_verification_token(user_id, card_key)
             return jsonify({'success': True, 'message': '验证成功', 'token': token})
     
-    # 标记已使用
-    redis_client.setex(used_key, 86400 * 30, user_id)
+    redis_setex(used_key, 86400 * 30, user_id)
     token = create_verification_token(user_id, card_key)
     
     return jsonify({'success': True, 'message': '验证成功', 'token': token})
@@ -77,16 +106,16 @@ def verify_post():
         return jsonify({'success': False, 'message': '卡密已过期'})
     
     used_key = f"used:{card_key}"
-    existing_user = redis_client.get(used_key)
+    existing_user = redis_get(used_key)
     
     if existing_user:
-        if existing_user.decode() != user_id:
+        if existing_user != user_id:
             return jsonify({'success': False, 'message': '卡密已被其他用户使用'})
         else:
             token = create_verification_token(user_id, card_key)
             return jsonify({'success': True, 'message': '验证成功', 'token': token})
     
-    redis_client.setex(used_key, 86400 * 30, user_id)
+    redis_setex(used_key, 86400 * 30, user_id)
     token = create_verification_token(user_id, card_key)
     
     return jsonify({'success': True, 'message': '验证成功', 'token': token})
@@ -100,13 +129,9 @@ def heartbeat():
         return jsonify({'success': False}), 401
     
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         return jsonify({'success': True})
     except:
         return jsonify({'success': False}), 401
-
-@app.route('/heartbeat', methods=['GET'])
-def heartbeat_get():
-    return jsonify({'success': True})
 
 app = app

@@ -3,10 +3,8 @@ import time
 
 app = Flask(__name__)
 
-# 管理密码（和 AndLua 保持一致）
 ADMIN_PASS = "admin123"
 
-# 卡密数据
 card_data = {
     "XcRNG": {
         "max": 5,
@@ -45,22 +43,38 @@ def verify():
     
     return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
 
-# ========== 管理接口 ==========
-@app.route('/admin/list', methods=['GET'])
-def admin_list():
+# ========== GET 方式添加卡密 ==========
+@app.route('/admin/add_get', methods=['GET'])
+def admin_add_get():
     pwd = request.args.get('pass', '')
     if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
-    result = {}
-    for k, v in card_data.items():
-        result[k] = {
-            "剩余": v["max"] - v["used"],
-            "总数": v["max"],
-            "已用": v["used"]
-        }
-    return jsonify({'code': 200, 'data': result})
+    key = request.args.get('key', '')
+    max_uses = request.args.get('max', 1)
+    expiry = request.args.get('expiry', 1900000000)
+    
+    try:
+        max_uses = int(max_uses)
+        expiry = int(expiry)
+    except:
+        return jsonify({'code': 400, 'msg': '参数格式错误'})
+    
+    if not key:
+        return jsonify({'code': 400, 'msg': '卡密不能为空'})
+    
+    if key in card_data:
+        return jsonify({'code': 400, 'msg': '卡密已存在'})
+    
+    card_data[key] = {
+        "max": max_uses,
+        "used": 0,
+        "users": [],
+        "expiry": expiry
+    }
+    return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
+# ========== POST 方式添加卡密 ==========
 @app.route('/admin/add', methods=['POST'])
 def admin_add():
     data = request.get_json()
@@ -82,6 +96,7 @@ def admin_add():
     }
     return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
+# ========== 删除卡密 ==========
 @app.route('/admin/del', methods=['POST'])
 def admin_del():
     data = request.get_json()
@@ -94,6 +109,22 @@ def admin_del():
     
     del card_data[key]
     return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
+
+# ========== 查看列表 ==========
+@app.route('/admin/list', methods=['GET'])
+def admin_list():
+    pwd = request.args.get('pass', '')
+    if pwd != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
+    result = {}
+    for k, v in card_data.items():
+        result[k] = {
+            "剩余": v["max"] - v["used"],
+            "总数": v["max"],
+            "已用": v["used"]
+        }
+    return jsonify({'code': 200, 'data': result})
 
 @app.route('/stats', methods=['GET'])
 def stats():

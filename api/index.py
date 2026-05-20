@@ -62,8 +62,7 @@ def verify():
         # 格式: "卡密": {"expiry": 过期时间戳}
         # 时间戳获取: https://www.timestamp-converter.com/
         valid_keys = {
-            "TEST-2024-ABCD": {"expiry": 1798761600},  # 2027-01-01 过期
-            "VIP-2025-EFGH": {"expiry": 1830326400},  # 2028-01-01 过期
+            "XcRNG": {"expiry": 1779292800},  # 2026-05-021 过期
         }
         
         if card_key not in valid_keys:

@@ -3,100 +3,119 @@ import time
 
 app = Flask(__name__)
 
+# 管理密码（必须和 AndLua 中的 ADMIN_PASS 一致）
+ADMIN_PASS = "admin123"
+
 # 卡密数据存储
-# 格式: {卡密: {"max": 总次数, "used": 已用次数, "users": [用户ID列表], "expiry": 过期时间戳}}
 card_data = {
     "XcRNG": {
-        "max": 5,                    # 最多5个人用
-        "used": 0,                   # 已用人数
-        "users": [],                 # 已使用的用户ID
-        "expiry": 1900000000         # 2030年过期（改这个调整时间）
+        "max": 5,
+        "used": 0,
+        "users": [],
+        "expiry": 1900000000
     },
 }
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({'status': 'ok', 'time': int(time.time())})
-
+# ========== 验证接口（Roblox 客户端调用）==========
 @app.route('/verify', methods=['GET'])
 def verify():
-    card_key = request.args.get('key', '')
-    user_id = request.args.get('userId', '')
-    current_time = int(time.time())
+    key = request.args.get('key', '')
+    uid = request.args.get('userId', '')
+    now = int(time.time())
     
-    # 检查卡密是否存在
-    if card_key not in card_data:
+    if key not in card_data:
         return jsonify({'success': False, 'message': '卡密不存在'})
     
-    data = card_data[card_key]
+    d = card_data[key]
     
-    # 检查是否过期
-    if data['expiry'] < current_time:
+    if d['expiry'] < now:
         return jsonify({'success': False, 'message': '卡密已过期'})
     
-    # 检查该用户是否已经用过
-    if user_id in data['users']:
+    if uid in d['users']:
         return jsonify({
             'success': True, 
-            'message': f'验证成功（该卡密剩余 {data["max"] - data["used"]} 次）'
+            'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'
         })
     
-    # 检查是否还有剩余次数
-    if data['used'] >= data['max']:
+    if d['used'] >= d['max']:
         return jsonify({
             'success': False, 
-            'message': f'卡密已达上限（最多 {data["max"]} 人使用）'
+            'message': f'卡密已达上限（最多 {d["max"]} 人）'
         })
     
-    # 使用一次
-    data['used'] += 1
-    data['users'].append(user_id)
+    d['used'] += 1
+    d['users'].append(uid)
     
     return jsonify({
         'success': True, 
-        'message': f'验证成功（剩余 {data["max"] - data["used"]} 次）'
+        'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'
     })
 
-@app.route('/verify', methods=['POST'])
-def verify_post():
+# ========== 添加卡密接口（AndLua 调用）==========
+@app.route('/admin/add', methods=['POST'])
+def add_key():
     data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': '无效请求'})
     
-    card_key = data.get('key', '')
-    user_id = str(data.get('userId', ''))
-    current_time = int(time.time())
+    if not data or data.get('pass') != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
     
-    if card_key not in card_data:
-        return jsonify({'success': False, 'message': '卡密不存在'})
+    key = data.get('key')
+    max_uses = data.get('max', 1)
+    expiry = data.get('expiry', 1900000000)
     
-    card = card_data[card_key]
+    if not key:
+        return jsonify({'code': 400, 'msg': '卡密不能为空'})
     
-    if card['expiry'] < current_time:
-        return jsonify({'success': False, 'message': '卡密已过期'})
+    if key in card_data:
+        return jsonify({'code': 400, 'msg': '卡密已存在'})
     
-    if user_id in card['users']:
-        return jsonify({'success': True, 'message': f'验证成功（剩余 {card["max"] - card["used"]} 次）'})
+    card_data[key] = {
+        "max": max_uses,
+        "used": 0,
+        "users": [],
+        "expiry": expiry
+    }
     
-    if card['used'] >= card['max']:
-        return jsonify({'success': False, 'message': f'卡密已达上限（最多 {card["max"]} 人）'})
-    
-    card['used'] += 1
-    card['users'].append(user_id)
-    
-    return jsonify({'success': True, 'message': f'验证成功（剩余 {card["max"] - card["used"]} 次）'})
+    return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
-@app.route('/stats', methods=['GET'])
-def stats():
+# ========== 删除卡密接口（AndLua 调用）==========
+@app.route('/admin/del', methods=['POST'])
+def del_key():
+    data = request.get_json()
+    
+    if not data or data.get('pass') != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
+    key = data.get('key')
+    
+    if key not in card_data:
+        return jsonify({'code': 400, 'msg': '卡密不存在'})
+    
+    del card_data[key]
+    return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
+
+# ========== 列出卡密接口（AndLua 调用）==========
+@app.route('/admin/list', methods=['GET'])
+def list_keys():
+    pwd = request.args.get('pass', '')
+    
+    if pwd != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
     result = {}
-    for key, data in card_data.items():
-        result[key] = {
-            "剩余次数": data["max"] - data["used"],
-            "总次数": data["max"],
-            "已用人数": data["used"],
-            "过期时间戳": data["expiry"],
-            "是否过期": data["expiry"] < int(time.time())
+    for k, v in card_data.items():
+        result[k] = {
+            "剩余": v["max"] - v["used"],
+            "总数": v["max"],
+            "已用": v["used"],
+            "过期时间": v["expiry"]
         }
-    return jsonify(result)
+    
+    return jsonify({'code': 200, 'data': result})
+
+# ========== 根路径测试 ==========
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({'status': 'ok', 'time': int(time.time())})
 
 app = app

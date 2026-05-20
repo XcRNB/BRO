@@ -74,6 +74,24 @@ def admin_add_get():
     }
     return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
+# ========== GET 方式删除卡密 ==========
+@app.route('/admin/del_get', methods=['GET'])
+def admin_del_get():
+    pwd = request.args.get('pass', '')
+    if pwd != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
+    key = request.args.get('key', '')
+    
+    if not key:
+        return jsonify({'code': 400, 'msg': '卡密不能为空'})
+    
+    if key not in card_data:
+        return jsonify({'code': 400, 'msg': '卡密不存在'})
+    
+    del card_data[key]
+    return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
+
 # ========== POST 方式添加卡密 ==========
 @app.route('/admin/add', methods=['POST'])
 def admin_add():
@@ -96,7 +114,7 @@ def admin_add():
     }
     return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
-# ========== 删除卡密 ==========
+# ========== POST 方式删除卡密 ==========
 @app.route('/admin/del', methods=['POST'])
 def admin_del():
     data = request.get_json()

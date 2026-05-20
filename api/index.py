@@ -14,7 +14,7 @@ redis_client = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:637
 
 # 有效卡密列表
 valid_keys = {
-    "XcRNG": {"expiry": 1779293443},  # 2026-05-21 过期
+    "XcRNG": {"expiry": 1779292800},  # 2026-05-21 过期（已修复）
 }
 
 def create_verification_token(user_id, card_key):

@@ -55,12 +55,8 @@ def load_card_data():
     data = redis_get('card_data')
     if data:
         return data
-    # 默认数据
-    default = {
-        "XcRNG": {"max": 5, "used": 0, "users": [], "expiry": 1900000000}
-    }
-    redis_set('card_data', default)
-    return default
+    # 没有默认数据，返回空字典
+    return {}
 
 def save_card_data(data):
     """保存卡密数据到 Redis"""
@@ -89,11 +85,11 @@ def verify():
     if d['expiry'] < now:
         return jsonify({'success': False, 'message': '卡密已过期'})
     
+    if d['used'] >= d['max']:
+        return jsonify({'success': False, 'message': '次数不足或该卡密已被别人使用'})
+    
     if uid in d['users']:
         return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
-    
-    if d['used'] >= d['max']:
-        return jsonify({'success': False, 'message': f'卡密已达上限（最多 {d["max"]} 人）'})
     
     d['used'] += 1
     d['users'].append(uid)

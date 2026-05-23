@@ -45,24 +45,21 @@ def redis_set(key, value):
         return False
 
 def load_card_data():
-    """从 Redis 加载卡密数据，没有就返回空字典"""
     data = redis_get('card_data')
     if data:
         return data
     return {}
 
 def save_card_data(data):
-    """保存卡密数据到 Redis"""
     redis_set('card_data', data)
 
-# 初始化卡密数据（空，没有默认卡密）
 card_data = load_card_data()
 
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
-# ========== 验证卡密（Roblox客户端用，不需要密码）==========
+# ========== 验证卡密（公开，不需要密码）==========
 @app.route('/verify', methods=['GET'])
 def verify():
     key = request.args.get('key', '')
@@ -89,11 +86,33 @@ def verify():
     
     return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
 
+# ========== 检查密码的通用函数 ==========
+def check_pass(pwd):
+    if not ADMIN_PASS or pwd != ADMIN_PASS:
+        return False
+    return True
+
+# ========== 查看卡密列表（需要密码）==========
+@app.route('/admin/list', methods=['GET'])
+def admin_list():
+    pwd = request.args.get('pass', '')
+    if not check_pass(pwd):
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
+    result = {}
+    for k, v in card_data.items():
+        result[k] = {
+            "剩余": v["max"] - v["used"],
+            "总数": v["max"],
+            "已用": v["used"]
+        }
+    return jsonify({'code': 200, 'data': result})
+
 # ========== 添加卡密（需要密码）==========
 @app.route('/admin/add', methods=['GET'])
 def admin_add():
     pwd = request.args.get('pass', '')
-    if pwd != ADMIN_PASS:
+    if not check_pass(pwd):
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     key = request.args.get('key', '')
@@ -126,7 +145,7 @@ def admin_add():
 @app.route('/admin/del', methods=['GET'])
 def admin_del():
     pwd = request.args.get('pass', '')
-    if pwd != ADMIN_PASS:
+    if not check_pass(pwd):
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     key = request.args.get('key', '')
@@ -142,27 +161,11 @@ def admin_del():
     
     return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
 
-# ========== 查看卡密列表（需要密码）==========
-@app.route('/admin/list', methods=['GET'])
-def admin_list():
-    pwd = request.args.get('pass', '')
-    if pwd != ADMIN_PASS:
-        return jsonify({'code': 401, 'msg': '密码错误'})
-    
-    result = {}
-    for k, v in card_data.items():
-        result[k] = {
-            "剩余": v["max"] - v["used"],
-            "总数": v["max"],
-            "已用": v["used"]
-        }
-    return jsonify({'code': 200, 'data': result})
-
 # ========== 查看统计（需要密码）==========
 @app.route('/stats', methods=['GET'])
 def stats():
     pwd = request.args.get('pass', '')
-    if pwd != ADMIN_PASS:
+    if not check_pass(pwd):
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     result = {}

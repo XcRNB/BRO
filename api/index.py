@@ -2,56 +2,27 @@ from flask import Flask, request, jsonify
 import time
 import os
 import json
-import urllib.request
 
 app = Flask(__name__)
 
-# ========== 从环境变量读取配置 ==========
-ADMIN_PASS = os.environ.get('ADMIN_PASS', '')
-REDIS_URL = os.environ.get('UPSTASH_REDIS_REST_URL', '')
-REDIS_TOKEN = os.environ.get('UPSTASH_REDIS_REST_TOKEN', '')
+ADMIN_PASS = os.environ.get('ADMIN_PASS', 'XcRNB-RNG-XcNBAA-713alo4937alp43791pqnc316')
 
-def redis_get(key):
-    try:
-        url = f"{REDIS_URL}/get/{key}"
-        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {REDIS_TOKEN}'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            result = data.get('result')
-            if result:
-                return json.loads(result)
-            return None
-    except Exception as e:
-        print(f"Redis GET 错误: {e}")
-        return None
-
-def redis_set(key, value):
-    try:
-        url = f"{REDIS_URL}/set/{key}"
-        data = json.dumps(json.dumps(value)).encode()
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={
-                'Authorization': f'Bearer {REDIS_TOKEN}',
-                'Content-Type': 'application/json'
-            },
-            method='POST'
-        )
-        urllib.request.urlopen(req, timeout=5)
-        return True
-    except Exception as e:
-        print(f"Redis SET 错误: {e}")
-        return False
+# 数据文件路径（存在 Railway 持久化磁盘上）
+DATA_FILE = '/app/data/card_data.json'
 
 def load_card_data():
-    data = redis_get('card_data')
-    if data:
-        return data
-    return {}
+    if not os.path.exists(DATA_FILE):
+        return {}
+    try:
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_card_data(data):
-    redis_set('card_data', data)
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f)
 
 card_data = load_card_data()
 
@@ -59,7 +30,6 @@ card_data = load_card_data()
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
-# ========== 验证卡密（公开，不需要密码）==========
 @app.route('/verify', methods=['GET'])
 def verify():
     key = request.args.get('key', '')
@@ -86,17 +56,10 @@ def verify():
     
     return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
 
-# ========== 检查密码的通用函数 ==========
-def check_pass(pwd):
-    if not ADMIN_PASS or pwd != ADMIN_PASS:
-        return False
-    return True
-
-# ========== 查看卡密列表（需要密码）==========
 @app.route('/admin/list', methods=['GET'])
 def admin_list():
     pwd = request.args.get('pass', '')
-    if not check_pass(pwd):
+    if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     result = {}
@@ -108,11 +71,10 @@ def admin_list():
         }
     return jsonify({'code': 200, 'data': result})
 
-# ========== 添加卡密（需要密码）==========
 @app.route('/admin/add', methods=['GET'])
 def admin_add():
     pwd = request.args.get('pass', '')
-    if not check_pass(pwd):
+    if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     key = request.args.get('key', '')
@@ -141,11 +103,10 @@ def admin_add():
     
     return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
-# ========== 删除卡密（需要密码）==========
 @app.route('/admin/del', methods=['GET'])
 def admin_del():
     pwd = request.args.get('pass', '')
-    if not check_pass(pwd):
+    if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     key = request.args.get('key', '')
@@ -161,11 +122,10 @@ def admin_del():
     
     return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
 
-# ========== 查看统计（需要密码）==========
 @app.route('/stats', methods=['GET'])
 def stats():
     pwd = request.args.get('pass', '')
-    if not ADMIN_PASS or pwd != ADMIN_PASS:
+    if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     result = {}

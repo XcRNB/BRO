@@ -6,20 +6,15 @@ import urllib.request
 
 app = Flask(__name__)
 
-ADMIN_PASS = "admin123"
-
-# Upstash Redis REST API 配置
+# ========== 从环境变量读取配置 ==========
+ADMIN_PASS = os.environ.get('ADMIN_PASS', '')
 REDIS_URL = os.environ.get('UPSTASH_REDIS_REST_URL', '')
 REDIS_TOKEN = os.environ.get('UPSTASH_REDIS_REST_TOKEN', '')
 
 def redis_get(key):
-    """从 Redis 获取数据"""
     try:
         url = f"{REDIS_URL}/get/{key}"
-        req = urllib.request.Request(
-            url,
-            headers={'Authorization': f'Bearer {REDIS_TOKEN}'}
-        )
+        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {REDIS_TOKEN}'})
         with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode())
             result = data.get('result')
@@ -31,7 +26,6 @@ def redis_get(key):
         return None
 
 def redis_set(key, value):
-    """存入 Redis"""
     try:
         url = f"{REDIS_URL}/set/{key}"
         data = json.dumps(json.dumps(value)).encode()
@@ -51,26 +45,24 @@ def redis_set(key, value):
         return False
 
 def load_card_data():
-    """从 Redis 加载卡密数据"""
+    """从 Redis 加载卡密数据，没有就返回空字典"""
     data = redis_get('card_data')
     if data:
         return data
-    # 没有默认数据，返回空字典
     return {}
 
 def save_card_data(data):
     """保存卡密数据到 Redis"""
     redis_set('card_data', data)
 
-# 初始化加载数据
+# 初始化卡密数据（空，没有默认卡密）
 card_data = load_card_data()
 
-# ========== 根路径 ==========
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
-# ========== 验证卡密 ==========
+# ========== 验证卡密（Roblox客户端用，不需要密码）==========
 @app.route('/verify', methods=['GET'])
 def verify():
     key = request.args.get('key', '')
@@ -86,7 +78,7 @@ def verify():
         return jsonify({'success': False, 'message': '卡密已过期'})
     
     if d['used'] >= d['max']:
-        return jsonify({'success': False, 'message': '次数不足或该卡密已被别人使用'})
+        return jsonify({'success': False, 'message': '卡密已达上限'})
     
     if uid in d['users']:
         return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
@@ -97,7 +89,7 @@ def verify():
     
     return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
 
-# ========== 添加卡密（GET）==========
+# ========== 添加卡密（需要密码）==========
 @app.route('/admin/add', methods=['GET'])
 def admin_add():
     pwd = request.args.get('pass', '')
@@ -130,7 +122,7 @@ def admin_add():
     
     return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
-# ========== 删除卡密（GET）==========
+# ========== 删除卡密（需要密码）==========
 @app.route('/admin/del', methods=['GET'])
 def admin_del():
     pwd = request.args.get('pass', '')
@@ -150,7 +142,7 @@ def admin_del():
     
     return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
 
-# ========== 查看卡密列表 ==========
+# ========== 查看卡密列表（需要密码）==========
 @app.route('/admin/list', methods=['GET'])
 def admin_list():
     pwd = request.args.get('pass', '')
@@ -166,9 +158,13 @@ def admin_list():
         }
     return jsonify({'code': 200, 'data': result})
 
-# ========== 统计查看 ==========
+# ========== 查看统计（需要密码）==========
 @app.route('/stats', methods=['GET'])
 def stats():
+    pwd = request.args.get('pass', '')
+    if pwd != ADMIN_PASS:
+        return jsonify({'code': 401, 'msg': '密码错误'})
+    
     result = {}
     for key, data in card_data.items():
         result[key] = {

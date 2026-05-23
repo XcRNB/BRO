@@ -165,7 +165,7 @@ def admin_del():
 @app.route('/stats', methods=['GET'])
 def stats():
     pwd = request.args.get('pass', '')
-    if not check_pass(pwd):
+    if not ADMIN_PASS or pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     result = {}

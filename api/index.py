@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 ADMIN_PASS = os.environ.get('ADMIN_PASS', 'XcRNB-RNG-XcNBAA-713alo4937alp43791pqnc316')
 
-# 数据文件路径（存在 Railway 持久化磁盘上）
+# 数据文件路径（Railway 持久化磁盘）
 DATA_FILE = '/app/data/card_data.json'
 
 def load_card_data():
@@ -30,10 +30,12 @@ card_data = load_card_data()
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
+# ========== 验证卡密（客户端用，支持设备指纹）==========
 @app.route('/verify', methods=['GET'])
 def verify():
     key = request.args.get('key', '')
     uid = request.args.get('userId', '')
+    fingerprint = request.args.get('fingerprint', '')
     now = int(time.time())
     
     if key not in card_data:
@@ -47,15 +49,19 @@ def verify():
     if d['used'] >= d['max']:
         return jsonify({'success': False, 'message': '卡密已达上限'})
     
-    if uid in d['users']:
+    # 使用 userId + 指纹 组合验证
+    user_key = uid + "_" + fingerprint
+    
+    if user_key in d['users']:
         return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
     
     d['used'] += 1
-    d['users'].append(uid)
+    d['users'].append(user_key)
     save_card_data(card_data)
     
     return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
 
+# ========== 管理接口 ==========
 @app.route('/admin/list', methods=['GET'])
 def admin_list():
     pwd = request.args.get('pass', '')
@@ -67,7 +73,7 @@ def admin_list():
         result[k] = {
             "剩余": v["max"] - v["used"],
             "总数": v["max"],
-            "已用": v["used"]
+            "已用": len(v["users"])
         }
     return jsonify({'code': 200, 'data': result})
 
@@ -133,7 +139,7 @@ def stats():
         result[key] = {
             "剩余次数": data["max"] - data["used"],
             "总次数": data["max"],
-            "已用人数": data["used"],
+            "已用人数": len(data["users"]),
             "过期时间戳": data["expiry"],
             "是否过期": data["expiry"] < int(time.time())
         }

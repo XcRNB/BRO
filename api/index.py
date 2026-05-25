@@ -34,24 +34,23 @@ def verify():
     key = request.args.get('key', '')
     uid = request.args.get('userId', '')
     fingerprint = request.args.get('fingerprint', '')
+    now = int(time.time())
     
     if key not in card_data:
         return jsonify({'success': False, 'message': '卡密不存在'})
     
     d = card_data[key]
     
+    if d['expiry'] < now:
+        return jsonify({'success': False, 'message': '卡密已过期'})
+    
     if d['used'] >= d['max']:
-        return jsonify({'success': False, 'message': f'卡密已达上限（最多 {d["max"]} 人）'})
+        return jsonify({'success': False, 'message': '卡密已达上限'})
     
     user_key = uid + "_" + fingerprint
     
     if user_key in d['users']:
         return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
-    
-    for existing_user in d['users']:
-        existing_uid = existing_user.split("_")[0]
-        if existing_uid == uid:
-            return jsonify({'success': False, 'message': '此卡密已在其他设备使用'})
     
     d['used'] += 1
     d['users'].append(user_key)
@@ -82,9 +81,11 @@ def admin_add():
     
     key = request.args.get('key', '')
     max_uses = request.args.get('max', 1)
+    expiry = request.args.get('expiry', 1900000000)
     
     try:
         max_uses = int(max_uses)
+        expiry = int(expiry)
     except:
         return jsonify({'code': 400, 'msg': '参数格式错误'})
     
@@ -97,11 +98,12 @@ def admin_add():
     card_data[key] = {
         "max": max_uses,
         "used": 0,
-        "users": []
+        "users": [],
+        "expiry": expiry
     }
     save_card_data(card_data)
     
-    return jsonify({'code': 200, 'msg': f'添加成功: {key}，最多{max_uses}人使用'})
+    return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
 
 @app.route('/admin/del', methods=['GET'])
 def admin_del():
@@ -133,7 +135,9 @@ def stats():
         result[key] = {
             "剩余次数": data["max"] - data["used"],
             "总次数": data["max"],
-            "已用人数": len(data["users"])
+            "已用人数": len(data["users"]),
+            "过期时间戳": data["expiry"],
+            "是否过期": data["expiry"] < int(time.time())
         }
     return jsonify(result)
 

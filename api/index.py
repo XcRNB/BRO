@@ -3,6 +3,7 @@ import time
 import os
 import json
 import hashlib
+import random
 
 app = Flask(__name__)
 
@@ -10,16 +11,12 @@ ADMIN_PASS = os.environ.get('ADMIN_PASS', 'XcRNB-RNG-XcNBAA-713alo4937alp43791pq
 
 DATA_FILE = '/app/data/player_data.json'
 
-# 获取设备唯一标识（手机信息加密）
+# ========== 设备ID生成 ==========
 def get_device_id(device_info):
-    """
-    传入设备信息字典，返回唯一设备ID
-    设备信息包括：IMEI、AndroidID、MAC地址等
-    用SHA256加密确保不可伪造
-    """
-    info_string = f"{device_info.get('imei', '')}_{device_info.get('android_id', '')}_{device_info.get('mac', '')}_{device_info.get('serial', '')}"
+    info_string = f"{device_info.get('imei', '')}_{device_info.get('android_id', '')}_{device_info.get('mac', '')}_{device_info.get('serial', '')}_{device_info.get('model', '')}"
     return hashlib.sha256(info_string.encode()).hexdigest()
 
+# ========== 数据读写（保存时自动创建目录） ==========
 def load_player_data():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -30,26 +27,20 @@ def load_player_data():
         return {}
 
 def save_player_data(data):
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)  # 就这一行负责创建目录
     with open(DATA_FILE, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
 
 player_data = load_player_data()
 
+# ========== 接口 ==========
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
-# ========== 玩家接口 ==========
-
-# 1. 注册/登录 - 绑定手机设备
+# 1. 注册/绑定设备
 @app.route('/player/register', methods=['POST'])
 def player_register():
-    """
-    玩家首次绑定设备
-    传入: device_info (手机信息JSON)
-    返回: player_id, 金币初始值
-    """
     data = request.get_json()
     if not data:
         return jsonify({'code': 400, 'msg': '请传入设备信息'})
@@ -71,14 +62,14 @@ def player_register():
                 'gold': info.get('gold', 0)
             })
     
-    # 新玩家注册
-    player_id = f"P{now}{str(len(player_data) + 1).zfill(4)}"
+    # 新玩家
+    player_id = f"P{now}{random.randint(1000, 9999)}"
     player_data[player_id] = {
         "device_id": device_id,
-        "gold": 100,  # 初始金币
+        "gold": 100,
         "register_time": now,
         "last_login": now,
-        "device_info": device_info  # 保存原始信息便于查证
+        "device_info": device_info
     }
     save_player_data(player_data)
     
@@ -89,18 +80,13 @@ def player_register():
         'gold': 100
     })
 
-# 2. 获取玩家金币
+# 2. 查询金币
 @app.route('/player/gold', methods=['GET'])
 def get_gold():
-    """
-    获取玩家金币
-    传入: player_id 或 device_info
-    """
     player_id = request.args.get('player_id', '')
     device_info_json = request.args.get('device_info', '')
     
     if player_id:
-        # 通过player_id查询
         if player_id not in player_data:
             return jsonify({'code': 404, 'msg': '玩家不存在'})
         return jsonify({
@@ -109,8 +95,7 @@ def get_gold():
             'gold': player_data[player_id].get('gold', 0)
         })
     
-    elif device_info_json:
-        # 通过设备信息查询
+    if device_info_json:
         try:
             device_info = json.loads(device_info_json)
             device_id = get_device_id(device_info)
@@ -131,10 +116,6 @@ def get_gold():
 # 3. 增加金币
 @app.route('/player/gold/add', methods=['POST'])
 def add_gold():
-    """
-    增加金币
-    传入: player_id 或 device_info, amount
-    """
     data = request.get_json()
     if not data:
         return jsonify({'code': 400, 'msg': '请传入参数'})
@@ -151,7 +132,6 @@ def add_gold():
     if amount <= 0:
         return jsonify({'code': 400, 'msg': '金额必须大于0'})
     
-    # 通过player_id查找
     if player_id and player_id in player_data:
         player_data[player_id]['gold'] = player_data[player_id].get('gold', 0) + amount
         save_player_data(player_data)
@@ -162,7 +142,6 @@ def add_gold():
             'gold': player_data[player_id]['gold']
         })
     
-    # 通过设备信息查找
     if device_info:
         device_id = get_device_id(device_info)
         for pid, info in player_data.items():
@@ -181,10 +160,6 @@ def add_gold():
 # 4. 扣除金币
 @app.route('/player/gold/sub', methods=['POST'])
 def sub_gold():
-    """
-    扣除金币
-    传入: player_id 或 device_info, amount
-    """
     data = request.get_json()
     if not data:
         return jsonify({'code': 400, 'msg': '请传入参数'})
@@ -201,7 +176,6 @@ def sub_gold():
     if amount <= 0:
         return jsonify({'code': 400, 'msg': '金额必须大于0'})
     
-    # 通过player_id查找
     if player_id and player_id in player_data:
         current = player_data[player_id].get('gold', 0)
         if current < amount:
@@ -215,7 +189,6 @@ def sub_gold():
             'gold': player_data[player_id]['gold']
         })
     
-    # 通过设备信息查找
     if device_info:
         device_id = get_device_id(device_info)
         for pid, info in player_data.items():
@@ -246,12 +219,11 @@ def admin_players():
         result[pid] = {
             "gold": info.get('gold', 0),
             "device_id": info.get('device_id', ''),
-            "register_time": info.get('register_time', 0),
-            "last_login": info.get('last_login', 0)
+            "register_time": info.get('register_time', 0)
         }
     return jsonify({'code': 200, 'data': result})
 
-# 6. 管理员 - 修改金币
+# 6. 管理员 - 设置金币
 @app.route('/admin/gold/set', methods=['POST'])
 def admin_set_gold():
     pwd = request.args.get('pass', '')
@@ -281,7 +253,7 @@ def admin_set_gold():
     
     return jsonify({
         'code': 200,
-        'msg': f'设置成功',
+        'msg': '设置成功',
         'player_id': player_id,
         'gold': gold
     })

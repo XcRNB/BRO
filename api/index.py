@@ -8,15 +8,9 @@ import random
 app = Flask(__name__)
 
 ADMIN_PASS = os.environ.get('ADMIN_PASS', 'XcRNB-RNG-XcNBAA-713alo4937alp43791pqnc316')
+DATA_FILE = '/tmp/player_data.json'
 
-DATA_FILE = '/app/data/player_data.json'
-
-# ========== 设备ID生成 ==========
-def get_device_id(device_info):
-    info_string = f"{device_info.get('imei', '')}_{device_info.get('android_id', '')}_{device_info.get('mac', '')}_{device_info.get('serial', '')}_{device_info.get('model', '')}"
-    return hashlib.sha256(info_string.encode()).hexdigest()
-
-# ========== 数据读写（保存时自动创建目录） ==========
+# ========== 数据读写 ==========
 def load_player_data():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -27,16 +21,23 @@ def load_player_data():
         return {}
 
 def save_player_data(data):
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)  # 就这一行负责创建目录
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
 player_data = load_player_data()
 
-# ========== 接口 ==========
+# ========== 设备ID生成 ==========
+def get_device_id(device_info):
+    info_string = f"{device_info.get('imei', '')}_{device_info.get('android_id', '')}_{device_info.get('mac', '')}_{device_info.get('serial', '')}_{device_info.get('model', '')}"
+    return hashlib.sha256(info_string.encode()).hexdigest()
+
+# ========== 根路径 ==========
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
+
+# ========== 玩家接口 ==========
 
 # 1. 注册/绑定设备
 @app.route('/player/register', methods=['POST'])
@@ -207,7 +208,9 @@ def sub_gold():
     
     return jsonify({'code': 404, 'msg': '玩家不存在'})
 
-# 5. 管理员 - 查看所有玩家
+# ========== 管理员接口 ==========
+
+# 5. 查看所有玩家
 @app.route('/admin/players', methods=['GET'])
 def admin_players():
     pwd = request.args.get('pass', '')
@@ -223,7 +226,7 @@ def admin_players():
         }
     return jsonify({'code': 200, 'data': result})
 
-# 6. 管理员 - 设置金币
+# 6. 管理员设置金币
 @app.route('/admin/gold/set', methods=['POST'])
 def admin_set_gold():
     pwd = request.args.get('pass', '')
@@ -258,7 +261,7 @@ def admin_set_gold():
         'gold': gold
     })
 
-# 7. 管理员 - 删除玩家
+# 7. 管理员删除玩家
 @app.route('/admin/player/del', methods=['GET'])
 def admin_del_player():
     pwd = request.args.get('pass', '')
@@ -278,5 +281,9 @@ def admin_del_player():
     
     return jsonify({'code': 200, 'msg': f'删除成功: {player_id}'})
 
+# ========== Vercel 需要 ==========
+app = app
+
+# ========== 本地运行 ==========
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

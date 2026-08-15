@@ -2,14 +2,25 @@ from flask import Flask, request, jsonify
 import time
 import os
 import json
+import hashlib
 
 app = Flask(__name__)
 
 ADMIN_PASS = os.environ.get('ADMIN_PASS', 'XcRNB-RNG-XcNBAA-713alo4937alp43791pqnc316')
 
-DATA_FILE = '/app/data/card_data.json'
+DATA_FILE = '/app/data/player_data.json'
 
-def load_card_data():
+# 获取设备唯一标识（手机信息加密）
+def get_device_id(device_info):
+    """
+    传入设备信息字典，返回唯一设备ID
+    设备信息包括：IMEI、AndroidID、MAC地址等
+    用SHA256加密确保不可伪造
+    """
+    info_string = f"{device_info.get('imei', '')}_{device_info.get('android_id', '')}_{device_info.get('mac', '')}_{device_info.get('serial', '')}"
+    return hashlib.sha256(info_string.encode()).hexdigest()
+
+def load_player_data():
     if not os.path.exists(DATA_FILE):
         return {}
     try:
@@ -18,127 +29,282 @@ def load_card_data():
     except:
         return {}
 
-def save_card_data(data):
+def save_player_data(data):
     os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f)
 
-card_data = load_card_data()
+player_data = load_player_data()
 
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({'status': 'ok', 'time': int(time.time())})
 
-@app.route('/verify', methods=['GET'])
-def verify():
-    key = request.args.get('key', '')
-    uid = request.args.get('userId', '')
-    fingerprint = request.args.get('fingerprint', '')
+# ========== 玩家接口 ==========
+
+# 1. 注册/登录 - 绑定手机设备
+@app.route('/player/register', methods=['POST'])
+def player_register():
+    """
+    玩家首次绑定设备
+    传入: device_info (手机信息JSON)
+    返回: player_id, 金币初始值
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'code': 400, 'msg': '请传入设备信息'})
+    
+    device_info = data.get('device_info', {})
+    if not device_info:
+        return jsonify({'code': 400, 'msg': '设备信息不能为空'})
+    
+    device_id = get_device_id(device_info)
     now = int(time.time())
     
-    if key not in card_data:
-        return jsonify({'success': False, 'message': '卡密不存在'})
+    # 检查是否已注册
+    for pid, info in player_data.items():
+        if info.get('device_id') == device_id:
+            return jsonify({
+                'code': 200,
+                'msg': '设备已绑定',
+                'player_id': pid,
+                'gold': info.get('gold', 0)
+            })
     
-    d = card_data[key]
+    # 新玩家注册
+    player_id = f"P{now}{str(len(player_data) + 1).zfill(4)}"
+    player_data[player_id] = {
+        "device_id": device_id,
+        "gold": 100,  # 初始金币
+        "register_time": now,
+        "last_login": now,
+        "device_info": device_info  # 保存原始信息便于查证
+    }
+    save_player_data(player_data)
     
-    if d['expiry'] < now:
-        return jsonify({'success': False, 'message': '卡密已过期'})
-    
-    if d['used'] >= d['max']:
-        return jsonify({'success': False, 'message': '卡密已达上限'})
-    
-    user_key = uid + "_" + fingerprint
-    
-    if user_key in d['users']:
-        return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
-    
-    d['used'] += 1
-    d['users'].append(user_key)
-    save_card_data(card_data)
-    
-    return jsonify({'success': True, 'message': f'验证成功（剩余 {d["max"] - d["used"]} 次）'})
+    return jsonify({
+        'code': 200,
+        'msg': '注册成功',
+        'player_id': player_id,
+        'gold': 100
+    })
 
-@app.route('/admin/list', methods=['GET'])
-def admin_list():
+# 2. 获取玩家金币
+@app.route('/player/gold', methods=['GET'])
+def get_gold():
+    """
+    获取玩家金币
+    传入: player_id 或 device_info
+    """
+    player_id = request.args.get('player_id', '')
+    device_info_json = request.args.get('device_info', '')
+    
+    if player_id:
+        # 通过player_id查询
+        if player_id not in player_data:
+            return jsonify({'code': 404, 'msg': '玩家不存在'})
+        return jsonify({
+            'code': 200,
+            'player_id': player_id,
+            'gold': player_data[player_id].get('gold', 0)
+        })
+    
+    elif device_info_json:
+        # 通过设备信息查询
+        try:
+            device_info = json.loads(device_info_json)
+            device_id = get_device_id(device_info)
+        except:
+            return jsonify({'code': 400, 'msg': '设备信息格式错误'})
+        
+        for pid, info in player_data.items():
+            if info.get('device_id') == device_id:
+                return jsonify({
+                    'code': 200,
+                    'player_id': pid,
+                    'gold': info.get('gold', 0)
+                })
+        return jsonify({'code': 404, 'msg': '未找到该设备绑定的玩家'})
+    
+    return jsonify({'code': 400, 'msg': '请传入player_id或device_info'})
+
+# 3. 增加金币
+@app.route('/player/gold/add', methods=['POST'])
+def add_gold():
+    """
+    增加金币
+    传入: player_id 或 device_info, amount
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'code': 400, 'msg': '请传入参数'})
+    
+    player_id = data.get('player_id', '')
+    device_info = data.get('device_info', {})
+    amount = data.get('amount', 0)
+    
+    try:
+        amount = int(amount)
+    except:
+        return jsonify({'code': 400, 'msg': '金额必须为数字'})
+    
+    if amount <= 0:
+        return jsonify({'code': 400, 'msg': '金额必须大于0'})
+    
+    # 通过player_id查找
+    if player_id and player_id in player_data:
+        player_data[player_id]['gold'] = player_data[player_id].get('gold', 0) + amount
+        save_player_data(player_data)
+        return jsonify({
+            'code': 200,
+            'msg': f'增加 {amount} 金币成功',
+            'player_id': player_id,
+            'gold': player_data[player_id]['gold']
+        })
+    
+    # 通过设备信息查找
+    if device_info:
+        device_id = get_device_id(device_info)
+        for pid, info in player_data.items():
+            if info.get('device_id') == device_id:
+                player_data[pid]['gold'] = player_data[pid].get('gold', 0) + amount
+                save_player_data(player_data)
+                return jsonify({
+                    'code': 200,
+                    'msg': f'增加 {amount} 金币成功',
+                    'player_id': pid,
+                    'gold': player_data[pid]['gold']
+                })
+    
+    return jsonify({'code': 404, 'msg': '玩家不存在'})
+
+# 4. 扣除金币
+@app.route('/player/gold/sub', methods=['POST'])
+def sub_gold():
+    """
+    扣除金币
+    传入: player_id 或 device_info, amount
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'code': 400, 'msg': '请传入参数'})
+    
+    player_id = data.get('player_id', '')
+    device_info = data.get('device_info', {})
+    amount = data.get('amount', 0)
+    
+    try:
+        amount = int(amount)
+    except:
+        return jsonify({'code': 400, 'msg': '金额必须为数字'})
+    
+    if amount <= 0:
+        return jsonify({'code': 400, 'msg': '金额必须大于0'})
+    
+    # 通过player_id查找
+    if player_id and player_id in player_data:
+        current = player_data[player_id].get('gold', 0)
+        if current < amount:
+            return jsonify({'code': 400, 'msg': f'金币不足，当前只有 {current} 金币'})
+        player_data[player_id]['gold'] = current - amount
+        save_player_data(player_data)
+        return jsonify({
+            'code': 200,
+            'msg': f'扣除 {amount} 金币成功',
+            'player_id': player_id,
+            'gold': player_data[player_id]['gold']
+        })
+    
+    # 通过设备信息查找
+    if device_info:
+        device_id = get_device_id(device_info)
+        for pid, info in player_data.items():
+            if info.get('device_id') == device_id:
+                current = info.get('gold', 0)
+                if current < amount:
+                    return jsonify({'code': 400, 'msg': f'金币不足，当前只有 {current} 金币'})
+                player_data[pid]['gold'] = current - amount
+                save_player_data(player_data)
+                return jsonify({
+                    'code': 200,
+                    'msg': f'扣除 {amount} 金币成功',
+                    'player_id': pid,
+                    'gold': player_data[pid]['gold']
+                })
+    
+    return jsonify({'code': 404, 'msg': '玩家不存在'})
+
+# 5. 管理员 - 查看所有玩家
+@app.route('/admin/players', methods=['GET'])
+def admin_players():
     pwd = request.args.get('pass', '')
     if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
     result = {}
-    for k, v in card_data.items():
-        result[k] = {
-            "剩余": v["max"] - v["used"],
-            "总数": v["max"],
-            "已用": len(v["users"])
+    for pid, info in player_data.items():
+        result[pid] = {
+            "gold": info.get('gold', 0),
+            "device_id": info.get('device_id', ''),
+            "register_time": info.get('register_time', 0),
+            "last_login": info.get('last_login', 0)
         }
     return jsonify({'code': 200, 'data': result})
 
-@app.route('/admin/add', methods=['GET'])
-def admin_add():
+# 6. 管理员 - 修改金币
+@app.route('/admin/gold/set', methods=['POST'])
+def admin_set_gold():
     pwd = request.args.get('pass', '')
     if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
-    key = request.args.get('key', '')
-    max_uses = request.args.get('max', 1)
-    expiry = request.args.get('expiry', 1900000000)
+    data = request.get_json()
+    if not data:
+        return jsonify({'code': 400, 'msg': '请传入参数'})
+    
+    player_id = data.get('player_id', '')
+    gold = data.get('gold', 0)
     
     try:
-        max_uses = int(max_uses)
-        expiry = int(expiry)
+        gold = int(gold)
     except:
-        return jsonify({'code': 400, 'msg': '参数格式错误'})
+        return jsonify({'code': 400, 'msg': '金额必须为数字'})
     
-    if not key:
-        return jsonify({'code': 400, 'msg': '卡密不能为空'})
+    if gold < 0:
+        return jsonify({'code': 400, 'msg': '金额不能为负数'})
     
-    if key in card_data:
-        return jsonify({'code': 400, 'msg': '卡密已存在'})
+    if player_id not in player_data:
+        return jsonify({'code': 404, 'msg': '玩家不存在'})
     
-    card_data[key] = {
-        "max": max_uses,
-        "used": 0,
-        "users": [],
-        "expiry": expiry
-    }
-    save_card_data(card_data)
+    player_data[player_id]['gold'] = gold
+    save_player_data(player_data)
     
-    return jsonify({'code': 200, 'msg': f'添加成功: {key}'})
+    return jsonify({
+        'code': 200,
+        'msg': f'设置成功',
+        'player_id': player_id,
+        'gold': gold
+    })
 
-@app.route('/admin/del', methods=['GET'])
-def admin_del():
+# 7. 管理员 - 删除玩家
+@app.route('/admin/player/del', methods=['GET'])
+def admin_del_player():
     pwd = request.args.get('pass', '')
     if pwd != ADMIN_PASS:
         return jsonify({'code': 401, 'msg': '密码错误'})
     
-    key = request.args.get('key', '')
+    player_id = request.args.get('player_id', '')
     
-    if not key:
-        return jsonify({'code': 400, 'msg': '卡密不能为空'})
+    if not player_id:
+        return jsonify({'code': 400, 'msg': 'player_id不能为空'})
     
-    if key not in card_data:
-        return jsonify({'code': 400, 'msg': '卡密不存在'})
+    if player_id not in player_data:
+        return jsonify({'code': 404, 'msg': '玩家不存在'})
     
-    del card_data[key]
-    save_card_data(card_data)
+    del player_data[player_id]
+    save_player_data(player_data)
     
-    return jsonify({'code': 200, 'msg': f'删除成功: {key}'})
+    return jsonify({'code': 200, 'msg': f'删除成功: {player_id}'})
 
-@app.route('/stats', methods=['GET'])
-def stats():
-    pwd = request.args.get('pass', '')
-    if pwd != ADMIN_PASS:
-        return jsonify({'code': 401, 'msg': '密码错误'})
-    
-    result = {}
-    for key, data in card_data.items():
-        result[key] = {
-            "剩余次数": data["max"] - data["used"],
-            "总次数": data["max"],
-            "已用人数": len(data["users"]),
-            "过期时间戳": data["expiry"],
-            "是否过期": data["expiry"] < int(time.time())
-        }
-    return jsonify(result)
-
-app = app
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
